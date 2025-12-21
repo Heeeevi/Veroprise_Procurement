@@ -1,6 +1,6 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, Coffee, LayoutDashboard, ShoppingCart, Package, Receipt, Users, Settings, BarChart3, LogOut } from 'lucide-react';
+import { Loader2, Coffee, LayoutDashboard, ShoppingCart, Package, Receipt, Users, BarChart3, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -36,7 +36,6 @@ export default function Index() {
     { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
     { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
     { icon: Users, label: 'Pengguna', href: '/users', roles: ['owner'] },
-    { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['owner', 'manager'] },
   ];
 
   const visibleMenus = menuItems.filter(item => role && item.roles.includes(role));
@@ -51,8 +50,8 @@ export default function Index() {
               <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display text-xl font-semibold">Coffee Shop ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Mini ERP untuk Kedai Kopi</p>
+              <h1 className="font-display text-xl font-semibold">Srupuut!</h1>
+              <p className="text-xs text-sidebar-foreground/70">Whistleblow ERP for Coffee Shop</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -86,14 +85,16 @@ export default function Index() {
             
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {visibleMenus.map((item) => (
-                <Card key={item.href} className="card-elevated cursor-pointer hover:border-primary transition-all group">
-                  <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
-                      <item.icon className="h-7 w-7 text-secondary-foreground group-hover:text-primary-foreground transition-colors" />
-                    </div>
-                    <span className="font-medium">{item.label}</span>
-                  </CardContent>
-                </Card>
+                <Link to={item.href} key={item.href}>
+                  <Card className="card-elevated cursor-pointer hover:border-primary transition-all group h-full">
+                    <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
+                        <item.icon className="h-7 w-7 text-secondary-foreground group-hover:text-primary-foreground transition-colors" />
+                      </div>
+                      <span className="font-medium">{item.label}</span>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
 

@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import { 
   Coffee, LayoutDashboard, ShoppingCart, Package, Receipt, 
-  Users, Settings, BarChart3, LogOut, Menu, ChevronDown, Store
+  Users, BarChart3, LogOut, Menu, ChevronDown, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -26,7 +26,6 @@ const menuItems = [
   { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
   { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
   { icon: Users, label: 'Pengguna', href: '/users', roles: ['owner'] },
-  { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['owner', 'manager'] },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -91,8 +90,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-semibold">Coffee ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Mini ERP System</p>
+              <h1 className="font-display text-lg font-semibold">Srupuut!</h1>
+              <p className="text-xs text-sidebar-foreground/70">Whistleblow ERP</p>
             </div>
           </Link>
         </div>
@@ -170,7 +169,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
                     </div>
                     <div>
-                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Coffee ERP</h1>
+                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Srupuut!</h1>
                     </div>
                   </div>
                 </div>
@@ -179,7 +178,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </SheetContent>
             </Sheet>
-            <span className="font-display font-semibold">Coffee ERP</span>
+            <span className="font-display font-semibold">Srupuut!</span>
           </div>
           <Button variant="ghost" size="icon" onClick={signOut} className="text-sidebar-foreground">
             <LogOut className="h-5 w-5" />
