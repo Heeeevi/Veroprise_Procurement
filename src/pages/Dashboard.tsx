@@ -4,8 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, ShoppingCart, Receipt, Package, Users, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart, Receipt } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import AIInsightsPanel from '@/components/AIInsightsPanel';
 
 interface DashboardStats {
   todaySales: number;
@@ -38,7 +39,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     if (!selectedOutlet) return;
-    
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -191,6 +192,9 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* AI Insights */}
+        <AIInsightsPanel />
 
         {/* Recent Transactions */}
         <Card className="card-warm">
