@@ -2,18 +2,20 @@ import { ReactNode } from 'react';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
-import { 
-  Coffee, LayoutDashboard, ShoppingCart, Package, Receipt, 
+import {
+  Coffee, LayoutDashboard, ShoppingCart, Package, Receipt,
   Users, BarChart3, LogOut, Menu, ChevronDown, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
-  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger 
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import HelpGuide from '@/components/HelpGuide';
+import StockNotifications from '@/components/StockNotifications';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -24,6 +26,7 @@ const menuItems = [
   { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['owner', 'manager', 'staff'] },
   { icon: Package, label: 'Inventory', href: '/inventory', roles: ['owner', 'manager', 'staff'] },
   { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
+  { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['owner', 'manager'] },
   { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
   { icon: Users, label: 'Pengguna', href: '/users', roles: ['owner'] },
 ];
@@ -67,8 +70,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             to={item.href}
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-              isActive 
-                ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+              isActive
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent"
             )}
           >
@@ -82,23 +85,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-        <div className="p-4 border-b border-sidebar-border">
+      {/* Desktop Sidebar - Fixed height, no scroll on main */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:h-screen lg:sticky lg:top-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+        <div className="p-4 border-b border-sidebar-border flex-shrink-0">
           <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-sidebar-primary rounded-xl flex items-center justify-center">
-              <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
+            <div className="w-10 h-10 bg-transparent flex items-center justify-center">
+              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-semibold">Srupuut!</h1>
-              <p className="text-xs text-sidebar-foreground/70">Whistleblow ERP</p>
+              <h1 className="font-display text-lg font-semibold">Veroprise ERP</h1>
+              <p className="text-xs text-sidebar-foreground/70">Cloud-Based ERP</p>
             </div>
           </Link>
         </div>
 
         {/* Outlet Selector */}
         {userOutlets.length > 0 && (
-          <div className="p-4 border-b border-sidebar-border">
+          <div className="p-4 border-b border-sidebar-border flex-shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between text-sidebar-foreground hover:bg-sidebar-accent">
@@ -126,11 +129,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         )}
 
+        {/* Navigation - scrollable if needed */}
         <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
           <NavLinks />
         </div>
 
-        <div className="p-4 border-t border-sidebar-border">
+        {/* User Footer - always at bottom */}
+        <div className="p-4 border-t border-sidebar-border flex-shrink-0 bg-sidebar">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
               <span className="text-sm font-medium">{profile?.full_name?.charAt(0) || 'U'}</span>
@@ -139,10 +144,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <p className="font-medium truncate">{profile?.full_name || user.email}</p>
               <p className="text-xs text-sidebar-foreground/70">{getRoleLabel()}</p>
             </div>
+            <StockNotifications />
           </div>
-          <Button 
-            variant="ghost" 
-            onClick={signOut} 
+          <Button
+            variant="ghost"
+            onClick={signOut}
             className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
           >
             <LogOut className="h-4 w-4 mr-2" />
@@ -165,11 +171,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
                 <div className="p-4 border-b border-sidebar-border">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-sidebar-primary rounded-xl flex items-center justify-center">
-                      <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
+                    <div className="w-10 h-10 bg-transparent flex items-center justify-center">
+                      <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
                     </div>
                     <div>
-                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Srupuut!</h1>
+                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Veroprise ERP</h1>
                     </div>
                   </div>
                 </div>
@@ -178,11 +184,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </SheetContent>
             </Sheet>
-            <span className="font-display font-semibold">Srupuut!</span>
+            <span className="font-display font-semibold">Veroprise ERP</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={signOut} className="text-sidebar-foreground">
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <StockNotifications />
+            <Button variant="ghost" size="icon" onClick={signOut} className="text-sidebar-foreground">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Main Content */}
@@ -190,6 +199,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Floating Help Guide */}
+      <HelpGuide />
     </div>
   );
 }

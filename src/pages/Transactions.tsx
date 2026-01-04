@@ -9,13 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Search, Filter } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Transactions() {
   const { selectedOutlet } = useOutlet();
+  const { toast } = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => {
     if (selectedOutlet) {
@@ -31,32 +33,37 @@ export default function Transactions() {
         .from('transactions')
         .select(`
           *,
-          profiles:user_id(full_name),
-          transaction_items(*)
+          transaction_items (
+            *,
+            product:products(name)
+          )
         `)
         .eq('outlet_id', selectedOutlet.id)
         .order('created_at', { ascending: false });
 
-      // Apply date filter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
+      const now = new Date();
       if (dateFilter === 'today') {
-        query = query.gte('created_at', today.toISOString());
+        const startOfDay = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+        query = query.gte('created_at', startOfDay);
       } else if (dateFilter === 'week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('created_at', weekAgo.toISOString());
+        const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
+        query = query.gte('created_at', startOfWeek);
       } else if (dateFilter === 'month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('created_at', monthAgo.toISOString());
+        const startOfMonth = new Date(now.setDate(now.getDate() - 30)).toISOString();
+        query = query.gte('created_at', startOfMonth);
       }
+      // 'all' filter does not apply any date restriction
 
-      const { data } = await query.limit(100);
-      setTransactions(data || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        toast({ title: 'Error', description: 'Gagal memuat transaksi', variant: 'destructive' });
+      } else {
+        setTransactions(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
     } finally {
       setLoading(false);
     }
@@ -107,15 +114,15 @@ export default function Transactions() {
                 />
               </div>
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-[180px]">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
+                  <SelectValue placeholder="Pilih Periode" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="today">Hari Ini</SelectItem>
-                  <SelectItem value="week">7 Hari</SelectItem>
-                  <SelectItem value="month">30 Hari</SelectItem>
-                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="week">7 Hari Terakhir</SelectItem>
+                  <SelectItem value="month">30 Hari Terakhir</SelectItem>
+                  <SelectItem value="all">Semua Waktu</SelectItem>
                 </SelectContent>
               </Select>
             </div>

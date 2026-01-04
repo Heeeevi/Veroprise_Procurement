@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Search, AlertTriangle, Package, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Package, ArrowUpDown, Truck, FileText, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface InventoryItemWithStock {
   id: string;
@@ -44,6 +45,26 @@ export default function Inventory() {
     min_stock: '',
     cost_per_unit: '',
   });
+
+  // Batch viewing state
+  const [selectedItemForBatches, setSelectedItemForBatches] = useState<InventoryItemWithStock | null>(null);
+  const [batches, setBatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (selectedItemForBatches) {
+      fetchBatches(selectedItemForBatches.id);
+    }
+  }, [selectedItemForBatches]);
+
+  const fetchBatches = async (itemId: string) => {
+    const { data } = await supabase
+      .from('inventory_batches')
+      .select('*')
+      .eq('inventory_item_id', itemId)
+      .gt('current_quantity', 0) // Only show available batches
+      .order('expiration_date', { ascending: true });
+    setBatches(data || []);
+  };
 
   useEffect(() => {
     fetchInventory();
@@ -142,10 +163,24 @@ export default function Inventory() {
             <p className="text-muted-foreground">Kelola stok bahan baku dan supplies</p>
           </div>
           {(isOwner || isManager) && (
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Item
-            </Button>
+            <div className="flex gap-2">
+              <Link to="/inventory/vendors">
+                <Button variant="outline">
+                  <Truck className="h-4 w-4 mr-2" />
+                  Manage Vendors
+                </Button>
+              </Link>
+              <Link to="/inventory/purchase-orders">
+                <Button variant="outline">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Purchase Orders
+                </Button>
+              </Link>
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Item
+              </Button>
+            </div>
           )}
         </div>
 
@@ -222,6 +257,14 @@ export default function Inventory() {
                       >
                         <ArrowUpDown className="h-4 w-4 mr-1" />
                         Adjust
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedItemForBatches(item)}
+                      >
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Batches
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -331,6 +374,53 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>Batal</Button>
             <Button onClick={handleAdjustStock}>Simpan</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Batch Details Dialog */}
+      <Dialog open={!!selectedItemForBatches} onOpenChange={(open) => !open && setSelectedItemForBatches(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">Detail Batch - {selectedItemForBatches?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch Code</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Received Date</TableHead>
+                  <TableHead>Expiry Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batches.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Tidak ada data batch</TableCell></TableRow>
+                ) : (
+                  batches.map(batch => {
+                    const isExpired = batch.expiration_date && new Date(batch.expiration_date) < new Date();
+                    const isNearExpiry = batch.expiration_date && new Date(batch.expiration_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+                    return (
+                      <TableRow key={batch.id}>
+                        <TableCell className="font-mono text-xs">{batch.sku_batch || '-'}</TableCell>
+                        <TableCell>{batch.current_quantity}</TableCell>
+                        <TableCell>{batch.received_date ? new Date(batch.received_date).toLocaleDateString('id-ID') : '-'}</TableCell>
+                        <TableCell className={isExpired ? 'text-red-600 font-bold' : isNearExpiry ? 'text-amber-600 font-semibold' : ''}>
+                          {batch.expiration_date ? new Date(batch.expiration_date).toLocaleDateString('id-ID') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {isExpired ? <Badge variant="destructive">Expired</Badge> :
+                            isNearExpiry ? <Badge variant="secondary" className="bg-amber-100 text-amber-800">Near Expiry</Badge> :
+                              <Badge variant="outline">Good</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </MainLayout>

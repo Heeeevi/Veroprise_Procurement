@@ -23,3 +23,11 @@ export function formatDateTime(date: string | Date): string {
     minute: '2-digit',
   });
 }
+
+export function formatDate(date: string | Date): string {
+  return new Date(date).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}

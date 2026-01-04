@@ -12,6 +12,10 @@ import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
 import Transactions from "./pages/Transactions";
 import Inventory from "./pages/Inventory";
+import Vendors from "./pages/Vendors";
+import PurchaseOrders from "./pages/PurchaseOrders";
+import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
+import HRPage from "./pages/HR";
 import Reports from "./pages/Reports";
 import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
@@ -34,6 +38,10 @@ const App = () => (
                 <Route path="/pos" element={<POS />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/inventory" element={<Inventory />} />
+                <Route path="/inventory/vendors" element={<Vendors />} />
+                <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
+                <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+                <Route path="/hr" element={<HRPage />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="*" element={<NotFound />} />

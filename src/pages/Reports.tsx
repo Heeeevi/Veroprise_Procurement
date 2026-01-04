@@ -4,12 +4,17 @@ import { useOutlet } from '@/hooks/useOutlet';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Receipt } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Receipt, FileDown, Loader2 } from 'lucide-react';
+import { generateReportPDF, ReportData } from '@/lib/pdfGenerator';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Reports() {
-  const { selectedOutlet, outlets } = useOutlet();
+  const { selectedOutlet } = useOutlet();
+  const { toast } = useToast();
   const [period, setPeriod] = useState('month');
+  const [generating, setGenerating] = useState(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalTransactions: 0,
@@ -19,8 +24,10 @@ export default function Reports() {
     avgTransaction: 0,
     topProducts: [] as { name: string; quantity: number; revenue: number }[],
     salesByPayment: [] as { method: string; total: number; count: number }[],
+    dailyData: [] as { date: string; sales: number; transactions: number }[],
   });
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   useEffect(() => {
     if (selectedOutlet) {
@@ -49,6 +56,11 @@ export default function Reports() {
         default:
           startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       }
+
+      setDateRange({
+        start: startDate.toLocaleDateString('id-ID'),
+        end: today.toLocaleDateString('id-ID')
+      });
 
       // Fetch transactions with items
       const { data: transactions } = await supabase
@@ -111,6 +123,21 @@ export default function Reports() {
       const salesByPayment = Array.from(paymentMap.entries())
         .map(([method, data]) => ({ method, ...data }));
 
+      // Daily data for chart
+      const dailyMap = new Map<string, { sales: number; transactions: number }>();
+      transactions?.forEach((tx) => {
+        const date = tx.created_at.split('T')[0];
+        const existing = dailyMap.get(date) || { sales: 0, transactions: 0 };
+        dailyMap.set(date, {
+          sales: existing.sales + Number(tx.total),
+          transactions: existing.transactions + 1,
+        });
+      });
+
+      const dailyData = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
       setStats({
         totalSales,
         totalTransactions,
@@ -120,11 +147,46 @@ export default function Reports() {
         avgTransaction,
         topProducts,
         salesByPayment,
+        dailyData,
       });
     } catch (error) {
       console.error('Error fetching report data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!selectedOutlet) return;
+
+    setGenerating(true);
+    try {
+      const profitMargin = stats.totalSales > 0 ? (stats.netProfit / stats.totalSales) * 100 : 0;
+
+      const reportData: ReportData = {
+        outletName: selectedOutlet.name,
+        periodLabel: period === 'week' ? '7 Hari Terakhir' : period === 'month' ? 'Bulan Ini' : 'Tahun Ini',
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        totalSales: stats.totalSales,
+        totalTransactions: stats.totalTransactions,
+        totalExpenses: stats.totalExpenses,
+        grossProfit: stats.grossProfit,
+        netProfit: stats.netProfit,
+        avgTransaction: stats.avgTransaction,
+        profitMargin,
+        topProducts: stats.topProducts,
+        salesByPayment: stats.salesByPayment,
+        dailyData: stats.dailyData,
+      };
+
+      await generateReportPDF(reportData);
+      toast({ title: 'Berhasil', description: 'Laporan PDF berhasil diunduh' });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Error', description: 'Gagal membuat PDF', variant: 'destructive' });
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -138,16 +200,26 @@ export default function Reports() {
             <h1 className="font-display text-2xl font-semibold">Laporan Keuangan</h1>
             <p className="text-muted-foreground">{selectedOutlet?.name}</p>
           </div>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">7 Hari</SelectItem>
-              <SelectItem value="month">Bulan Ini</SelectItem>
-              <SelectItem value="year">Tahun Ini</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">7 Hari</SelectItem>
+                <SelectItem value="month">Bulan Ini</SelectItem>
+                <SelectItem value="year">Tahun Ini</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleDownloadPDF} disabled={generating || loading}>
+              {generating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4 mr-2" />
+              )}
+              {generating ? 'Generating...' : 'Download PDF'}
+            </Button>
+          </div>
         </div>
 
         {/* Summary Cards */}

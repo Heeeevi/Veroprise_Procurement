@@ -46,12 +46,12 @@ export default function Index() {
       <header className="bg-sidebar text-sidebar-foreground shadow-medium">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-sidebar-primary rounded-xl flex items-center justify-center">
-              <Coffee className="h-5 w-5 text-sidebar-primary-foreground" />
+            <div className="w-10 h-10 bg-transparent flex items-center justify-center">
+              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
             <div>
-              <h1 className="font-display text-xl font-semibold">Srupuut!</h1>
-              <p className="text-xs text-sidebar-foreground/70">Whistleblow ERP for Coffee Shop</p>
+              <h1 className="font-display text-xl font-semibold">Veroprise ERP</h1>
+              <p className="text-xs text-sidebar-foreground/70">Cloud-Based ERP All-in-One</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -82,7 +82,7 @@ export default function Index() {
         ) : (
           <>
             <h2 className="font-display text-2xl font-semibold mb-6">Selamat Datang, {profile?.full_name?.split(' ')[0] || 'User'}!</h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {visibleMenus.map((item) => (
                 <Link to={item.href} key={item.href}>

@@ -8,135 +8,142 @@
 
 @layer base {
   :root {
-    /* Warm Coffee Tones */
-    --background: 30 25% 97%;
-    --foreground: 24 25% 15%;
+    /* Veroprise Theme - sleek, modern blue/purple */
+    --background: 222 47% 98%; /* Cool white */
+    --foreground: 222 47% 11%;
 
-    --card: 30 30% 99%;
-    --card-foreground: 24 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 30 30% 99%;
-    --popover-foreground: 24 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Primary - Rich Espresso Brown */
-    --primary: 24 45% 25%;
-    --primary-foreground: 30 25% 97%;
+    /* Primary - Royal Purple/Blue gradient feel */
+    --primary: 262 83% 58%; /* Vivid Purple */
+    --primary-foreground: 210 40% 98%;
 
-    /* Secondary - Warm Cream */
-    --secondary: 35 35% 92%;
-    --secondary-foreground: 24 45% 25%;
+    /* Secondary - Soft Blue */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
 
-    /* Muted - Soft Latte */
-    --muted: 30 20% 94%;
-    --muted-foreground: 24 15% 45%;
+    /* Muted - Cool Gray */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    /* Accent - Sage Green (for success/nature feel) */
-    --accent: 145 25% 85%;
-    --accent-foreground: 145 35% 25%;
+    /* Accent - Electric Blue/Cyan for tech feel */
+    --accent: 199 89% 48%; 
+    --accent-foreground: 222 47% 11.2%;
 
-    /* Destructive - Warm Red */
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 30 25% 97%;
+    /* Destructive - Red */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
     /* Borders & Inputs */
-    --border: 30 20% 88%;
-    --input: 30 20% 88%;
-    --ring: 24 45% 35%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    /* Sidebar - Dark Roast */
-    --sidebar-background: 24 35% 18%;
-    --sidebar-foreground: 30 25% 92%;
-    --sidebar-primary: 35 60% 65%;
-    --sidebar-primary-foreground: 24 35% 15%;
-    --sidebar-accent: 24 30% 25%;
-    --sidebar-accent-foreground: 30 25% 92%;
-    --sidebar-border: 24 25% 25%;
-    --sidebar-ring: 35 60% 65%;
+    /* Sidebar - Dark Blue/Slate */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 262 83% 58%;
 
-    /* Custom Colors for Coffee Shop */
-    --coffee-dark: 24 45% 20%;
-    --coffee-medium: 24 35% 35%;
-    --coffee-light: 30 30% 60%;
-    --cream: 35 40% 92%;
-    --sage: 145 25% 70%;
-    --sage-dark: 145 30% 35%;
-    --caramel: 35 65% 55%;
-    --mocha: 20 30% 40%;
+    /* Custom Colors for Veroprise Dashboard */
+    --brand-primary: 262 83% 58%;
+    --brand-secondary: 200 95% 45%; 
+    --brand-dark: 222 47% 11%;
+    --brand-light: 210 40% 98%;
+    
+    /* Legacy variables mapping for compatibility */
+    --coffee-dark: 222 47% 11%;
+    --coffee-medium: 217 33% 17%;
+    --coffee-light: 210 40% 96%;
+    --cream: 222 100% 99%;
+    --sage: 199 89% 48%; /* Mapped to accent */
+    --sage-dark: 199 89% 38%;
+    --caramel: 262 83% 68%; /* Mapped to primary light */
+    --mocha: 222 47% 25%;
 
     /* Status Colors */
-    --success: 145 50% 40%;
-    --success-foreground: 145 50% 97%;
-    --warning: 40 90% 50%;
-    --warning-foreground: 40 90% 15%;
-    --info: 200 70% 50%;
-    --info-foreground: 200 70% 97%;
+    --success: 142 76% 36%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
 
     /* Gradients */
-    --gradient-warm: linear-gradient(135deg, hsl(30 25% 97%) 0%, hsl(35 35% 92%) 100%);
-    --gradient-coffee: linear-gradient(135deg, hsl(24 35% 18%) 0%, hsl(24 45% 25%) 100%);
-    --gradient-sage: linear-gradient(135deg, hsl(145 25% 85%) 0%, hsl(145 30% 75%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(210 40% 98%) 0%, hsl(220 30% 94%) 100%); /* Cool background */
+    --gradient-coffee: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(200 95% 45%) 100%); /* Brand Gradient (Purple to Blue) */
+    --gradient-sage: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(200 80% 60%) 100%);
 
     /* Shadows */
-    --shadow-soft: 0 2px 8px -2px hsl(24 25% 15% / 0.08);
-    --shadow-medium: 0 4px 16px -4px hsl(24 25% 15% / 0.12);
-    --shadow-strong: 0 8px 32px -8px hsl(24 25% 15% / 0.16);
+    --shadow-soft: 0 2px 10px -2px rgba(0, 0, 0, 0.05);
+    --shadow-medium: 0 4px 20px -4px rgba(99, 102, 241, 0.1); 
+    --shadow-strong: 0 8px 30px -8px rgba(99, 102, 241, 0.2);
   }
 
   .dark {
-    --background: 24 25% 10%;
-    --foreground: 30 25% 92%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
 
-    --card: 24 25% 14%;
-    --card-foreground: 30 25% 92%;
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 24 25% 14%;
-    --popover-foreground: 30 25% 92%;
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 35 55% 60%;
-    --primary-foreground: 24 25% 10%;
+    --primary: 262 83% 64%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 24 20% 20%;
-    --secondary-foreground: 30 25% 85%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 24 15% 18%;
-    --muted-foreground: 30 15% 55%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 145 20% 25%;
-    --accent-foreground: 145 35% 75%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 55% 45%;
-    --destructive-foreground: 30 25% 95%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 24 15% 22%;
-    --input: 24 15% 22%;
-    --ring: 35 55% 50%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 262 83% 58%;
 
-    --sidebar-background: 24 30% 8%;
-    --sidebar-foreground: 30 25% 88%;
-    --sidebar-primary: 35 55% 55%;
-    --sidebar-primary-foreground: 24 25% 10%;
-    --sidebar-accent: 24 25% 15%;
-    --sidebar-accent-foreground: 30 25% 88%;
-    --sidebar-border: 24 20% 15%;
-    --sidebar-ring: 35 55% 55%;
-
-    --coffee-dark: 24 35% 12%;
-    --coffee-medium: 24 25% 25%;
-    --coffee-light: 30 20% 45%;
-    --cream: 35 20% 25%;
-    --sage: 145 15% 30%;
-    --sage-dark: 145 20% 55%;
-    --caramel: 35 50% 45%;
-    --mocha: 20 20% 30%;
-
-    --success: 145 40% 45%;
-    --success-foreground: 145 40% 10%;
-    --warning: 40 80% 45%;
-    --warning-foreground: 40 80% 10%;
-    --info: 200 60% 45%;
-    --info-foreground: 200 60% 10%;
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262 83% 64%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 262 83% 64%;
+    
+    /* Legacy mapping for Dark Mode */
+    --coffee-dark: 222 47% 8%;
+    --coffee-medium: 217 33% 25%;
+    --coffee-light: 217 33% 40%;
+    --cream: 222 47% 14%;
+    --sage: 199 89% 48%;
+    --sage-dark: 199 89% 38%;
+    --caramel: 262 83% 64%;
+    --mocha: 222 47% 25%;
+    
+    --success: 142 70% 50%;
+    --success-foreground: 144 17% 14%;
+    --warning: 48 96% 89%;
+    --warning-foreground: 38 92% 50%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
   }
 }
 

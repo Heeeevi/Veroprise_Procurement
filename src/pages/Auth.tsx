@@ -60,12 +60,12 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-warm p-4">
       <Card className="w-full max-w-md shadow-strong">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
-            <Coffee className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto w-24 h-24 bg-transparent flex items-center justify-center">
+            <img src="/logo.jpg" alt="Veroprise Logo" className="w-full h-full object-contain" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-display">Coffee Shop ERP</CardTitle>
-            <CardDescription>Sistem manajemen kedai kopi Anda</CardDescription>
+            <CardTitle className="text-2xl font-display">Veroprise ERP</CardTitle>
+            <CardDescription>Platform Cloud-Based ERP all-in-one untuk UMKM</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
