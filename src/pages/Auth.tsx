@@ -75,6 +75,12 @@ export default function Auth() {
               <TabsTrigger value="register">Daftar</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
+              <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                <p className="font-semibold text-primary">Try me (master account)</p>
+                <p className="mt-1">Username: <span className="font-mono">miminerp@prise.com</span></p>
+                <p>Password: <span className="font-mono">veroprise</span></p>
+                <p className="mt-1 text-muted-foreground">Gunakan akun demo ini untuk langsung mencoba.</p>
+              </div>
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
