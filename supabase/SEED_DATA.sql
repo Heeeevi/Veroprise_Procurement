@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SEED DATA FOR DEVELOPMENT & TESTING
--- Veroprise ERP + Booking System
+-- BarberDoc ERP + Booking System
 -- ============================================================================
 -- Run this AFTER running COMPLETE_SCHEMA.sql
 -- ============================================================================

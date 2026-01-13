@@ -50,7 +50,7 @@ export default function WelcomeTour() {
 
     useEffect(() => {
         // Check if user has seen the tour
-        const tourSeen = localStorage.getItem('veroprise_tour_completed');
+        const tourSeen = localStorage.getItem('barberdoc_tour_completed');
         if (!tourSeen) {
             // Show tour after a short delay
             const timer = setTimeout(() => setIsVisible(true), 1000);
@@ -69,7 +69,7 @@ export default function WelcomeTour() {
     };
 
     const handleComplete = () => {
-        localStorage.setItem('veroprise_tour_completed', 'true');
+        localStorage.setItem('barberdoc_tour_completed', 'true');
         setIsVisible(false);
         setHasSeenTour(true);
     };
@@ -120,7 +120,7 @@ export default function WelcomeTour() {
                     <div className="flex items-center gap-2 mb-4">
                         <Sparkles className="h-5 w-5" />
                         <span className="text-sm font-medium opacity-90">
-                            Selamat Datang di Veroprise ERP!
+                            Selamat Datang di BarberDoc ERP!
                         </span>
                     </div>
                     <div className="flex items-center gap-4">

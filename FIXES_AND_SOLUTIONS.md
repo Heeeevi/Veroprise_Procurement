@@ -63,7 +63,7 @@ Sistem otomatis kurangi stok dari tabel INVENTORY_ITEMS:
 
 **Solusi:** Run SQL `FIX_OUTLET_AND_PRODUCTS.sql`
 
-### 3. **Logo dan Branding masih "Veroprise"**
+### 3. **Logo dan Branding**
 **Root Cause:** Hardcoded logo path dan nama aplikasi di multiple files
 
 **Fixed:**
@@ -177,7 +177,7 @@ npm run dev
 #### A. Test Login
 1. Buka: http://localhost:8082/auth
 2. Login dengan akun master kamu
-3. **Expected:** Logo "BarberDoc" muncul, bukan "Veroprise"
+3. **Expected:** Logo "BarberDoc" muncul
 
 #### B. Test Outlet Selection
 1. Setelah login, cek dropdown outlet di header

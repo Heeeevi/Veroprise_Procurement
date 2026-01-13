@@ -1,4 +1,4 @@
-# Veroprise ERP - Barbershop Management System
+# BarberDoc ERP - Barbershop Management System
 
 > **Modern Cloud-Based ERP untuk Barbershop dengan Sistem Booking Terintegrasi**
 
@@ -11,7 +11,7 @@
 
 ## 🎯 Overview
 
-**Veroprise ERP** adalah sistem manajemen barbershop lengkap dengan fitur:
+**BarberDoc ERP** adalah sistem manajemen barbershop lengkap dengan fitur:
 - ✅ **POS (Point of Sale)** - Kasir cepat & mudah
 - ✅ **Booking System** - Reservasi online untuk pelanggan
 - ✅ **Inventory Management** - Tracking stock multi-outlet
@@ -244,7 +244,7 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Optional
-VITE_APP_NAME=Veroprise ERP
+VITE_APP_NAME=BarberDoc ERP
 VITE_API_URL=http://localhost:3000
 ```
 

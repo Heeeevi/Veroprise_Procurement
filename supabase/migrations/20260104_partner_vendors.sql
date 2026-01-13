@@ -1,12 +1,12 @@
--- Partner Vendors (Rekomendasi Vendor dari Veroprise)
--- Ini adalah vendor yang sudah diverifikasi dan direkomendasikan oleh Veroprise
+-- Partner Vendors (Rekomendasi Vendor dari BarberDoc)
+-- Ini adalah vendor yang sudah diverifikasi dan direkomendasikan oleh BarberDoc
 
 CREATE TABLE public.partner_vendors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     logo_url TEXT,
-    category TEXT NOT NULL, -- 'coffee_beans', 'syrup', 'packaging', 'equipment', 'pharmacy', 'retail'
-    business_types TEXT[] NOT NULL DEFAULT '{}', -- Array: ['fnb', 'coffee_shop', 'retail', 'pharmacy']
+    category TEXT NOT NULL, -- 'grooming', 'equipment', 'furniture', 'consumables'
+    business_types TEXT[] NOT NULL DEFAULT '{}', -- Array: ['barbershop', 'salon', 'spa']
     description TEXT,
     contact_whatsapp TEXT,
     contact_email TEXT,

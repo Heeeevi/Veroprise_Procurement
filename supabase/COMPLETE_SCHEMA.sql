@@ -1,5 +1,5 @@
 -- ============================================================================
--- VEROPRISE ERP + BOOKING SYSTEM - COMPLETE SCHEMA
+-- BARBERDOC ERP + BOOKING SYSTEM - COMPLETE SCHEMA
 -- Database: PostgreSQL (Supabase)
 -- Version: 1.0
 -- Date: 2026-01-12
@@ -840,7 +840,7 @@ ON CONFLICT DO NOTHING;
 DO $$
 BEGIN
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'VEROPRISE ERP SCHEMA SETUP COMPLETE!';
+    RAISE NOTICE 'BARBERDOC ERP SCHEMA SETUP COMPLETE!';
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Tables created: 30+';
     RAISE NOTICE 'Indexes created: 20+';

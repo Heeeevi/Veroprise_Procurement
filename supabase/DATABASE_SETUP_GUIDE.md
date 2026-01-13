@@ -1,4 +1,4 @@
-# 🗄️ Database Setup Guide - Veroprise ERP + Booking System
+# 🗄️ Database Setup Guide - BarberDoc ERP + Booking System
 
 ## 📋 Overview
 Complete SQL schema untuk sistem ERP barbershop dengan modul booking terintegrasi.

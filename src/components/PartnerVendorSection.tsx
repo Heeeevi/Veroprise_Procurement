@@ -66,7 +66,7 @@ export default function PartnerVendorSection() {
     };
 
     const handleWhatsApp = (phone: string, vendorName: string) => {
-        const message = encodeURIComponent(`Halo ${vendorName}, saya tertarik dengan produk Anda. Saya menemukan Anda dari Veroprise ERP.`);
+        const message = encodeURIComponent(`Halo ${vendorName}, saya tertarik dengan produk Anda. Saya menemukan Anda dari BarberDoc ERP.`);
         window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
     };
 
@@ -80,14 +80,14 @@ export default function PartnerVendorSection() {
                 <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                         <span className="text-2xl">🤝</span>
-                        Rekomendasi Partner Veroprise
+                        Rekomendasi Partner BarberDoc
                     </h2>
                     <p className="text-sm text-muted-foreground">
                         Vendor terpercaya yang sudah diverifikasi untuk mendukung bisnis Anda
                     </p>
                 </div>
                 <Badge variant="outline" className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
-                    Ads by Veroprise
+                    Ads by BarberDoc
                 </Badge>
             </div>
 

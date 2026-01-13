@@ -1,7 +1,7 @@
-# BarberBook - Sistem Booking Terintegrasi dengan ERP
+# BarberDoc - Sistem Booking Terintegrasi dengan ERP
 
 ## 🎯 Overview
-Sistem booking barbershop yang terintegrasi penuh dengan Veroprise ERP. Setiap booking yang dikonfirmasi otomatis tercatat di laporan keuangan dan transaksi.
+Sistem booking barbershop yang terintegrasi penuh dengan BarberDoc ERP. Setiap booking yang dikonfirmasi otomatis tercatat di laporan keuangan dan transaksi.
 
 ### 💰 PENTING: Sistem Deposit Booking
 

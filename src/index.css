@@ -1,4 +1,4 @@
-/* Coffee Shop ERP - Warm & Cozy Design System */
+/* BarberDoc ERP - Professional Barbershop Design System */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -7,7 +7,7 @@
 
 @layer base {
   :root {
-    /* Veroprise Theme - sleek, modern blue/purple */
+    /* BarberDoc Theme - sleek, modern blue/purple */
     --background: 222 47% 98%; /* Cool white */
     --foreground: 222 47% 11%;
 
@@ -54,7 +54,7 @@
     --sidebar-border: 217 33% 17%;
     --sidebar-ring: 262 83% 58%;
 
-    /* Custom Colors for Veroprise Dashboard */
+    /* Custom Colors for BarberDoc Dashboard */
     --brand-primary: 262 83% 58%;
     --brand-secondary: 200 95% 45%; 
     --brand-dark: 222 47% 11%;

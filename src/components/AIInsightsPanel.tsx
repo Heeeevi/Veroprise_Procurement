@@ -119,7 +119,7 @@ export default function AIInsightsPanel() {
                     <Sparkles className="h-5 w-5 text-purple-500" />
                     <h2 className="font-display text-lg font-semibold">AI Insights</h2>
                     <Badge variant="secondary" className="text-xs">
-                        Powered by Veroprise AI
+                        Powered by BarberDoc AI
                     </Badge>
                 </div>
                 <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing}>
