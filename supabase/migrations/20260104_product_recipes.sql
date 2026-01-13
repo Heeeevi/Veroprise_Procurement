@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS product_recipes (
 -- Enable RLS
 ALTER TABLE product_recipes ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for re-running migration)
+DROP POLICY IF EXISTS "Authenticated users can read product_recipes" ON product_recipes;
+DROP POLICY IF EXISTS "Admins can manage product_recipes" ON product_recipes;
+
 -- RLS Policies - All authenticated users can read
 CREATE POLICY "Authenticated users can read product_recipes"
 ON product_recipes FOR SELECT TO authenticated USING (true);

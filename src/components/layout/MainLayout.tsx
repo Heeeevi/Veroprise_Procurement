@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import {
   Coffee, LayoutDashboard, ShoppingCart, Package, Receipt,
-  Users, BarChart3, LogOut, Menu, ChevronDown, Store
+  Users, BarChart3, LogOut, Menu, ChevronDown, Store, Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +24,7 @@ interface MainLayoutProps {
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['owner', 'manager', 'staff', 'investor'] },
   { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['owner', 'manager', 'staff'] },
+  { icon: Calendar, label: 'Booking', href: '/bookings', roles: ['owner', 'manager', 'staff'] },
   { icon: Package, label: 'Inventory', href: '/inventory', roles: ['owner', 'manager', 'staff'] },
   { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
   { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['owner', 'manager'] },
@@ -90,11 +91,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="p-4 border-b border-sidebar-border flex-shrink-0">
           <Link to="/dashboard" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-transparent flex items-center justify-center">
-              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
+              <img src="/Logo Long 2.png" alt="BarberDoc Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-semibold">Veroprise ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Cloud-Based ERP</p>
+              <h1 className="font-display text-lg font-semibold">BarberDoc ERP</h1>
+              <p className="text-xs text-sidebar-foreground/70">Barbershop Management</p>
             </div>
           </Link>
         </div>
@@ -172,10 +173,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <div className="p-4 border-b border-sidebar-border">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-transparent flex items-center justify-center">
-                      <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
+                      <img src="/Logo Long 2.png" alt="BarberDoc Logo" className="w-full h-full object-contain" />
                     </div>
                     <div>
-                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Veroprise ERP</h1>
+                      <h1 className="font-display text-lg font-semibold text-sidebar-foreground">BarberDoc ERP</h1>
                     </div>
                   </div>
                 </div>
@@ -184,7 +185,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </SheetContent>
             </Sheet>
-            <span className="font-display font-semibold">Veroprise ERP</span>
+            <span className="font-display font-semibold">BarberDoc ERP</span>
           </div>
           <div className="flex items-center gap-1">
             <StockNotifications />

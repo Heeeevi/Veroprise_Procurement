@@ -6,15 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Receipt, FileDown, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Receipt, FileDown, Loader2, Building2 } from 'lucide-react';
 import { generateReportPDF, ReportData } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 
+interface Outlet {
+  id: string;
+  name: string;
+  address?: string;
+}
+
 export default function Reports() {
-  const { selectedOutlet } = useOutlet();
+  const { selectedOutlet, outlets: contextOutlets } = useOutlet();
   const { toast } = useToast();
   const [period, setPeriod] = useState('month');
   const [generating, setGenerating] = useState(false);
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [reportOutletId, setReportOutletId] = useState<string>('all');
   const [stats, setStats] = useState({
     totalSales: 0,
     totalTransactions: 0,
@@ -29,14 +37,35 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
+  // Fetch all outlets for dropdown
   useEffect(() => {
-    if (selectedOutlet) {
-      fetchReportData();
-    }
-  }, [selectedOutlet, period]);
+    const fetchOutlets = async () => {
+      const { data } = await supabase
+        .from('outlets')
+        .select('id, name, address')
+        .eq('is_active', true)
+        .order('name');
+      setOutlets(data || []);
+      // Default to selected outlet or 'all'
+      if (selectedOutlet) {
+        setReportOutletId(selectedOutlet.id);
+      }
+    };
+    fetchOutlets();
+  }, [selectedOutlet]);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [reportOutletId, period]);
+
+  const getSelectedOutletName = () => {
+    if (reportOutletId === 'all') return 'Semua Outlet';
+    const outlet = outlets.find(o => o.id === reportOutletId);
+    return outlet?.name || 'Outlet';
+  };
 
   const fetchReportData = async () => {
-    if (!selectedOutlet) return;
+    if (!reportOutletId) return;
 
     try {
       const today = new Date();
@@ -62,20 +91,30 @@ export default function Reports() {
         end: today.toLocaleDateString('id-ID')
       });
 
-      // Fetch transactions with items
-      const { data: transactions } = await supabase
+      // Fetch transactions with items - filter by outlet if specific outlet selected
+      let transactionsQuery = supabase
         .from('transactions')
         .select('*, transaction_items(*)')
-        .eq('outlet_id', selectedOutlet.id)
         .gte('created_at', startDate.toISOString());
+      
+      if (reportOutletId !== 'all') {
+        transactionsQuery = transactionsQuery.eq('outlet_id', reportOutletId);
+      }
+      
+      const { data: transactions } = await transactionsQuery;
 
-      // Fetch expenses
-      const { data: expenses } = await supabase
+      // Fetch expenses - filter by outlet if specific outlet selected
+      let expensesQuery = supabase
         .from('expenses')
         .select('*')
-        .eq('outlet_id', selectedOutlet.id)
         .eq('status', 'approved')
         .gte('created_at', startDate.toISOString());
+      
+      if (reportOutletId !== 'all') {
+        expensesQuery = expensesQuery.eq('outlet_id', reportOutletId);
+      }
+      
+      const { data: expenses } = await expensesQuery;
 
       const totalSales = transactions?.reduce((sum, t) => sum + Number(t.total), 0) || 0;
       const totalTransactions = transactions?.length || 0;
@@ -157,14 +196,14 @@ export default function Reports() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!selectedOutlet) return;
+    if (!reportOutletId) return;
 
     setGenerating(true);
     try {
       const profitMargin = stats.totalSales > 0 ? (stats.netProfit / stats.totalSales) * 100 : 0;
 
       const reportData: ReportData = {
-        outletName: selectedOutlet.name,
+        outletName: getSelectedOutletName(),
         periodLabel: period === 'week' ? '7 Hari Terakhir' : period === 'month' ? 'Bulan Ini' : 'Tahun Ini',
         startDate: dateRange.start,
         endDate: dateRange.end,
@@ -198,9 +237,26 @@ export default function Reports() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-semibold">Laporan Keuangan</h1>
-            <p className="text-muted-foreground">{selectedOutlet?.name}</p>
+            <p className="text-muted-foreground">{getSelectedOutletName()}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Outlet Selector */}
+            <Select value={reportOutletId} onValueChange={setReportOutletId}>
+              <SelectTrigger className="w-48">
+                <Building2 className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Pilih Outlet" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Outlet</SelectItem>
+                {outlets.map((outlet) => (
+                  <SelectItem key={outlet.id} value={outlet.id}>
+                    {outlet.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {/* Period Selector */}
             <Select value={period} onValueChange={setPeriod}>
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -211,6 +267,7 @@ export default function Reports() {
                 <SelectItem value="year">Tahun Ini</SelectItem>
               </SelectContent>
             </Select>
+            
             <Button onClick={handleDownloadPDF} disabled={generating || loading}>
               {generating ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

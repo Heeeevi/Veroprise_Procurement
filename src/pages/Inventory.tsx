@@ -6,13 +6,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Search, AlertTriangle, Package, ArrowUpDown, Truck, FileText, Calendar } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Package, ArrowUpDown, Truck, FileText, Calendar, Trash2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface InventoryItemWithStock {
@@ -22,6 +23,16 @@ interface InventoryItemWithStock {
   min_stock: number;
   current_stock: number;
   cost_per_unit: number;
+  is_active?: boolean;
+}
+
+interface DeleteCheckResult {
+  hasTransactions: boolean;
+  hasPurchaseOrders: boolean;
+  hasRecipes: boolean;
+  transactionCount: number;
+  poCount: number;
+  recipeCount: number;
 }
 
 export default function Inventory() {
@@ -33,7 +44,9 @@ export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItemWithStock | null>(null);
+  const [deleteCheckResult, setDeleteCheckResult] = useState<DeleteCheckResult | null>(null);
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustType, setAdjustType] = useState<'add' | 'remove'>('add');
   const [adjustNotes, setAdjustNotes] = useState('');
@@ -82,6 +95,104 @@ export default function Inventory() {
       console.error('Error fetching inventory:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkDeleteDependencies = async (itemId: string): Promise<DeleteCheckResult> => {
+    try {
+      // Check inventory transactions
+      const { data: transactions } = await supabase
+        .from('inventory_transactions')
+        .select('id', { count: 'exact' })
+        .eq('inventory_item_id', itemId);
+
+      // Check purchase order items
+      const { data: poItems } = await supabase
+        .from('purchase_order_items')
+        .select('id', { count: 'exact' })
+        .eq('inventory_item_id', itemId);
+
+      // Check product recipes (BOM)
+      const { data: recipes } = await supabase
+        .from('product_recipes')
+        .select('id', { count: 'exact' })
+        .eq('inventory_item_id', itemId);
+
+      return {
+        hasTransactions: (transactions?.length || 0) > 0,
+        hasPurchaseOrders: (poItems?.length || 0) > 0,
+        hasRecipes: (recipes?.length || 0) > 0,
+        transactionCount: transactions?.length || 0,
+        poCount: poItems?.length || 0,
+        recipeCount: recipes?.length || 0,
+      };
+    } catch (error) {
+      console.error('Error checking dependencies:', error);
+      return {
+        hasTransactions: false,
+        hasPurchaseOrders: false,
+        hasRecipes: false,
+        transactionCount: 0,
+        poCount: 0,
+        recipeCount: 0,
+      };
+    }
+  };
+
+  const handleDeleteClick = async (item: InventoryItemWithStock) => {
+    setSelectedItem(item);
+    const checkResult = await checkDeleteDependencies(item.id);
+    setDeleteCheckResult(checkResult);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedItem) return;
+
+    try {
+      const hasAnyDependency = 
+        deleteCheckResult?.hasTransactions || 
+        deleteCheckResult?.hasPurchaseOrders || 
+        deleteCheckResult?.hasRecipes;
+
+      if (hasAnyDependency) {
+        // SOFT DELETE - Mark as inactive
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ is_active: false })
+          .eq('id', selectedItem.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Item di-nonaktifkan',
+          description: `${selectedItem.name} telah dinonaktifkan. Data historis tetap tersimpan untuk integritas laporan keuangan.`,
+        });
+      } else {
+        // HARD DELETE - No dependencies
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', selectedItem.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Item dihapus',
+          description: `${selectedItem.name} berhasil dihapus dari sistem.`,
+        });
+      }
+
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+      setDeleteCheckResult(null);
+      fetchInventory();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Gagal menghapus item',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -266,6 +377,17 @@ export default function Inventory() {
                         <Calendar className="h-4 w-4 mr-1" />
                         Batches
                       </Button>
+                      {(isOwner || isManager) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteClick(item)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Hapus
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -421,6 +543,101 @@ export default function Inventory() {
               </TableBody>
             </Table>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              Konfirmasi Hapus Item
+            </DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus item berikut?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            {/* Item Info */}
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="font-semibold text-lg">{selectedItem?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                Stok: {selectedItem?.current_stock} {selectedItem?.unit}
+              </p>
+            </div>
+
+            {/* Dependency Warning */}
+            {deleteCheckResult && (
+              <div className="space-y-2">
+                {(deleteCheckResult.hasTransactions || deleteCheckResult.hasPurchaseOrders || deleteCheckResult.hasRecipes) ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      <p className="font-semibold mb-2">⚠️ Item ini memiliki data historis:</p>
+                      <ul className="list-disc list-inside space-y-1 text-sm">
+                        {deleteCheckResult.hasTransactions && (
+                          <li>{deleteCheckResult.transactionCount} transaksi inventory</li>
+                        )}
+                        {deleteCheckResult.hasPurchaseOrders && (
+                          <li>{deleteCheckResult.poCount} purchase order</li>
+                        )}
+                        {deleteCheckResult.hasRecipes && (
+                          <li>{deleteCheckResult.recipeCount} resep produk (BOM)</li>
+                        )}
+                      </ul>
+                      <p className="mt-3 font-semibold text-amber-600">
+                        Item akan di-<strong>nonaktifkan</strong> (soft delete) untuk menjaga integritas laporan keuangan.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert>
+                    <AlertDescription>
+                      ✓ Item ini tidak memiliki data historis dan dapat dihapus sepenuhnya.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            {/* Impact Warning */}
+            <Alert>
+              <AlertDescription className="text-sm">
+                <p className="font-semibold mb-1">📊 Dampak terhadap Sistem:</p>
+                <ul className="list-disc list-inside space-y-1 text-xs">
+                  <li><strong>Laporan Keuangan:</strong> Data historis tetap tersimpan</li>
+                  <li><strong>Purchase Order:</strong> PO lama tetap valid</li>
+                  <li><strong>Cashflow:</strong> Tidak terpengaruh (data historis utuh)</li>
+                  <li><strong>Form Input:</strong> Item tidak akan muncul di dropdown baru</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setSelectedItem(null);
+                setDeleteCheckResult(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleteCheckResult?.hasTransactions || deleteCheckResult?.hasPurchaseOrders || deleteCheckResult?.hasRecipes
+                ? 'Nonaktifkan Item'
+                : 'Hapus Permanen'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>

@@ -49,7 +49,7 @@ export default function Vendors() {
     const fetchVendors = async () => {
         try {
             const { data, error } = await supabase
-                .from('vendors')
+                .from('partner_vendors')
                 .select('*')
                 .order('name');
 
@@ -70,7 +70,7 @@ export default function Vendors() {
         }
 
         try {
-            const { error } = await supabase.from('vendors').insert(newVendor);
+            const { error } = await supabase.from('partner_vendors').insert(newVendor);
 
             if (error) throw error;
 

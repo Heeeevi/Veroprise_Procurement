@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, ShoppingCart, Receipt } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart, Receipt, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import AIInsightsPanel from '@/components/AIInsightsPanel';
 
@@ -15,6 +15,8 @@ interface DashboardStats {
   lowStockItems: number;
   monthSales: number;
   monthExpenses: number;
+  todayBookings: number;
+  monthBookingsRevenue: number;
 }
 
 export default function Dashboard() {
@@ -27,6 +29,8 @@ export default function Dashboard() {
     lowStockItems: 0,
     monthSales: 0,
     monthExpenses: 0,
+    todayBookings: 0,
+    monthBookingsRevenue: 0,
   });
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +91,25 @@ export default function Dashboard() {
         .from('inventory_items')
         .select('*', { count: 'exact', head: true });
 
+      // Today's bookings
+      const { data: todayBookingsData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('outlet_id', selectedOutlet.id)
+        .gte('created_at', today);
+
+      const todayBookings = todayBookingsData?.length || 0;
+
+      // Month bookings revenue
+      const { data: monthBookingsData } = await supabase
+        .from('bookings')
+        .select('payment_amount')
+        .eq('outlet_id', selectedOutlet.id)
+        .eq('payment_status', 'paid')
+        .gte('created_at', monthStart);
+
+      const monthBookingsRevenue = monthBookingsData?.reduce((sum, b) => sum + Number(b.payment_amount), 0) || 0;
+
       // Recent transactions
       const { data: recent } = await supabase
         .from('transactions')
@@ -102,6 +125,8 @@ export default function Dashboard() {
         lowStockItems: 0,
         monthSales,
         monthExpenses,
+        todayBookings,
+        monthBookingsRevenue,
       });
 
       setRecentTransactions(recent || []);
@@ -140,6 +165,23 @@ export default function Dashboard() {
                 </div>
                 <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
                   <ShoppingCart className="h-6 w-6 text-accent-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="card-warm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Booking Hari Ini</p>
+                  <p className="text-2xl font-bold mt-1">{stats.todayBookings}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatCurrency(stats.monthBookingsRevenue)} bulan ini
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center">
+                  <Calendar className="h-6 w-6 text-info" />
                 </div>
               </div>
             </CardContent>

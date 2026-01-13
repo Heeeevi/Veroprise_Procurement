@@ -193,6 +193,41 @@ export interface CartItem {
   notes?: string;
 }
 
+// Booking types
+export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'canceled';
+export type BookingPaymentStatus = 'unpaid' | 'paid' | 'refunded';
+
+export interface Booking {
+  id: string;
+  outlet_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  slot_time: string;
+  status: BookingStatus;
+  payment_status: BookingPaymentStatus;
+  payment_amount: number;
+  payment_method: PaymentMethod | null;
+  transaction_id: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  outlet?: Outlet;
+  confirmer?: Profile;
+}
+
+export interface BookingStats {
+  outlet_id: string;
+  booking_date: string;
+  total_bookings: number;
+  completed_bookings: number;
+  canceled_bookings: number;
+  paid_bookings: number;
+  total_revenue: number;
+}
+
 // Dashboard stats
 export interface DashboardStats {
   totalSales: number;
@@ -201,4 +236,10 @@ export interface DashboardStats {
   netProfit: number;
   topProducts: { name: string; quantity: number; revenue: number }[];
   salesByDay: { date: string; total: number }[];
+  bookings?: {
+    total: number;
+    revenue: number;
+    pending: number;
+    completed: number;
+  };
 }

@@ -18,6 +18,9 @@ import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
 import HRPage from "./pages/HR";
 import Reports from "./pages/Reports";
 import Users from "./pages/Users";
+import Bookings from "./pages/Bookings";
+import PublicBooking from "./pages/PublicBooking";
+import TestPage from "./pages/TestPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,9 +36,12 @@ const App = () => (
             <ShiftProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/test" element={<TestPage />} />
+                <Route path="/book" element={<PublicBooking />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/pos" element={<POS />} />
+                <Route path="/bookings" element={<Bookings />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/inventory/vendors" element={<Vendors />} />

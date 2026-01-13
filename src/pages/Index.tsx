@@ -135,11 +135,11 @@ export default function Index() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-transparent flex items-center justify-center">
-              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-xl" />
+              <img src="/Logo Long 2.png" alt="BarberDoc Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="font-display text-xl font-semibold">Veroprise ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Cloud-Based ERP All-in-One</p>
+              <h1 className="font-display text-xl font-semibold">BarberDoc ERP</h1>
+              <p className="text-xs text-sidebar-foreground/70">Barbershop Management</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

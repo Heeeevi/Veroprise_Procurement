@@ -53,6 +53,65 @@ export type Database = {
         }
         Relationships: []
       }
+      bookings: {
+        Row: {
+          id: string
+          outlet_id: string
+          customer_name: string
+          customer_email: string | null
+          customer_phone: string
+          slot_time: string
+          status: string
+          payment_status: string
+          payment_amount: number
+          notes: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          outlet_id: string
+          customer_name: string
+          customer_email?: string | null
+          customer_phone: string
+          slot_time: string
+          status?: string
+          payment_status?: string
+          payment_amount?: number
+          notes?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          outlet_id?: string
+          customer_name?: string
+          customer_email?: string | null
+          customer_phone?: string
+          slot_time?: string
+          status?: string
+          payment_status?: string
+          payment_amount?: number
+          notes?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       categories: {
         Row: {
           created_at: string
