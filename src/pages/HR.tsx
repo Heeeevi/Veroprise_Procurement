@@ -2,13 +2,14 @@ import { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Clock, Banknote, UserPlus } from 'lucide-react';
+import { Users, Clock, Banknote, UserPlus, Target } from 'lucide-react';
 import EmployeeList from '@/components/hr/EmployeeList';
 import AttendanceView from '@/components/hr/AttendanceView';
 import PayrollView from '@/components/hr/PayrollView';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import EmployeeForm from '@/components/hr/EmployeeForm';
+import HRBonusView from '@/components/hr/HRBonusView';
 
 export default function HRPage() {
     const [activeTab, setActiveTab] = useState('employees');
@@ -51,6 +52,10 @@ export default function HRPage() {
                             <Banknote className="h-4 w-4" />
                             Payroll
                         </TabsTrigger>
+                        <TabsTrigger value="bonus" className="flex items-center gap-2">
+                            <Target className="h-4 w-4" />
+                            Bonus & Target
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="employees">
@@ -87,6 +92,10 @@ export default function HRPage() {
                                 <PayrollView />
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    <TabsContent value="bonus">
+                        <HRBonusView />
                     </TabsContent>
                 </Tabs>
             </div>

@@ -8,7 +8,13 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Receipt, FileDown, Loader2, Building2 } from 'lucide-react';
 import { generateReportPDF, ReportData } from '@/lib/pdfGenerator';
+import { generateReportPDF, ReportData } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
+import { Calendar as CalendarIcon, Save } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Outlet {
   id: string;
@@ -34,9 +40,24 @@ export default function Reports() {
     topProducts: [] as { name: string; quantity: number; revenue: number }[],
     salesByPayment: [] as { method: string; total: number; count: number }[],
     dailyData: [] as { date: string; sales: number; transactions: number }[],
+    cashToDeposit: 0,
   });
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  // Daily Closing State
+  const [showClosingDialog, setShowClosingDialog] = useState(false);
+  const [closingDate, setClosingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [closingData, setClosingData] = useState<any>(null);
+  const [actualCash, setActualCash] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
+  const [closingStats, setClosingStats] = useState({
+    totalSales: 0,
+    cashSales: 0,
+    nonCashSales: 0,
+    expenses: 0,
+    cashToDeposit: 0,
+  });
 
   // Fetch all outlets for dropdown
   useEffect(() => {
@@ -92,29 +113,29 @@ export default function Reports() {
         end: today.toLocaleDateString('id-ID')
       });
 
-      // Fetch transactions with items - filter by outlet if specific outlet selected
+      // Fetch transactions with items
       let transactionsQuery = supabase
         .from('transactions')
         .select('*, transaction_items(*)')
         .gte('created_at', startDate.toISOString());
-      
+
       if (reportOutletId !== 'all') {
         transactionsQuery = transactionsQuery.eq('outlet_id', reportOutletId);
       }
-      
+
       const { data: transactions } = await transactionsQuery;
 
-      // Fetch expenses - filter by outlet if specific outlet selected
+      // Fetch expenses
       let expensesQuery = supabase
         .from('expenses')
         .select('*')
         .eq('status', 'approved')
         .gte('created_at', startDate.toISOString());
-      
+
       if (reportOutletId !== 'all') {
         expensesQuery = expensesQuery.eq('outlet_id', reportOutletId);
       }
-      
+
       const { data: expenses } = await expensesQuery;
 
       const totalSales = transactions?.reduce((sum, t) => sum + Number(t.total), 0) || 0;
@@ -125,7 +146,7 @@ export default function Reports() {
       let cogs = 0;
       transactions?.forEach((tx) => {
         tx.transaction_items?.forEach((item: any) => {
-          cogs += Number(item.cost_price) * item.quantity;
+          cogs += Number(item.cost_price || 0) * item.quantity;
         });
       });
 
@@ -150,14 +171,45 @@ export default function Reports() {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 5);
 
-      // Sales by payment method
+      // Sales by payment method (handling split payments)
       const paymentMap = new Map<string, { total: number; count: number }>();
+      let totalCashSales = 0;
+
       transactions?.forEach((tx) => {
-        const existing = paymentMap.get(tx.payment_method) || { total: 0, count: 0 };
-        paymentMap.set(tx.payment_method, {
-          total: existing.total + Number(tx.total),
-          count: existing.count + 1,
-        });
+        if (tx.is_split_payment && tx.payment_details) {
+          // Parse JSONB payment details
+          const details = tx.payment_details as any[];
+          details.forEach((split: any) => {
+            const method = split.method;
+            const amount = Number(split.amount);
+
+            const existing = paymentMap.get(method) || { total: 0, count: 0 };
+            paymentMap.set(method, {
+              total: existing.total + amount,
+              // Only count transaction once per method if simpler, or fraction? 
+              // For simplicity, we just count relevant methods involved
+              count: existing.count + 1
+            });
+
+            if (method === 'cash') {
+              totalCashSales += amount;
+            }
+          });
+        } else {
+          // Single payment
+          const method = tx.payment_method;
+          const amount = Number(tx.total);
+
+          const existing = paymentMap.get(method) || { total: 0, count: 0 };
+          paymentMap.set(method, {
+            total: existing.total + amount,
+            count: existing.count + 1,
+          });
+
+          if (method === 'cash') {
+            totalCashSales += amount;
+          }
+        }
       });
 
       const salesByPayment = Array.from(paymentMap.entries())
@@ -178,18 +230,24 @@ export default function Reports() {
         .map(([date, data]) => ({ date, ...data }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
+      // Calculate Cash Setor (Cash Sales - Expenses)
+      // Assuming all expenses are paid via cash for now
+      const cashToDeposit = Math.max(0, totalCashSales - totalExpenses);
+
       setStats({
         totalSales,
         totalTransactions,
         totalExpenses,
-        cogs, // HPP
+        cogs,
         grossProfit,
         netProfit,
         avgTransaction,
         topProducts,
         salesByPayment,
         dailyData,
-      });
+        // Add calculated fields to state if needed, or compute in render
+        cashToDeposit,
+      } as any);
     } catch (error) {
       console.error('Error fetching report data:', error);
     } finally {
@@ -227,11 +285,11 @@ export default function Reports() {
         .from('transactions')
         .select('*, transaction_items(*)')
         .gte('created_at', startDate.toISOString());
-      
+
       if (reportOutletId !== 'all') {
         transactionsQuery = transactionsQuery.eq('outlet_id', reportOutletId);
       }
-      
+
       const { data: txData } = await transactionsQuery;
 
       const allProductsMap = new Map<string, { quantity: number; revenue: number }>();
@@ -254,11 +312,11 @@ export default function Reports() {
         .from('bookings')
         .select('*')
         .gte('created_at', startDate.toISOString());
-      
+
       if (reportOutletId !== 'all') {
         bookingsQuery = bookingsQuery.eq('outlet_id', reportOutletId);
       }
-      
+
       const { data: bookingsData } = await bookingsQuery;
 
       const bookingStats = {
@@ -299,6 +357,141 @@ export default function Reports() {
     }
   };
 
+  const fetchClosingData = async () => {
+    if (!reportOutletId || reportOutletId === 'all') {
+      toast({ title: 'Error', description: 'Pilih outlet spesifik untuk melakukan closing', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      // Fetch stats for the specific closing date
+      const startDate = new Date(closingDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(closingDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Transactions
+      const { data: transactions } = await (supabase as any)
+        .from('transactions')
+        .select('*')
+        .eq('outlet_id', reportOutletId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+      // Expenses
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('outlet_id', reportOutletId)
+        .eq('status', 'approved')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+      const totalSales = transactions?.reduce((sum: number, t: any) => sum + Number(t.total), 0) || 0;
+      const totalExpenses = expenses?.reduce((sum: number, e: any) => sum + Number(e.amount), 0) || 0;
+
+      let cashSales = 0;
+      let qrisSales = 0;
+      let transferSales = 0;
+      let selfOlshopSales = 0;
+
+      transactions?.forEach((tx: any) => {
+        if (tx.is_split_payment && tx.payment_details) {
+          const details = tx.payment_details as any[];
+          details.forEach((split: any) => {
+            if (split.method === 'cash') cashSales += Number(split.amount);
+            else if (split.method === 'qris') qrisSales += Number(split.amount);
+            else if (split.method === 'transfer') transferSales += Number(split.amount);
+            else if (split.method === 'olshop') selfOlshopSales += Number(split.amount);
+          });
+        } else {
+          if (tx.payment_method === 'cash') cashSales += Number(tx.total);
+          else if (tx.payment_method === 'qris') qrisSales += Number(tx.total);
+          else if (tx.payment_method === 'transfer') transferSales += Number(tx.total);
+          else if (tx.payment_method === 'olshop') selfOlshopSales += Number(tx.total);
+        }
+      });
+
+      const nonCashSales = qrisSales + transferSales + selfOlshopSales;
+      const cashToDeposit = Math.max(0, cashSales - totalExpenses);
+
+      setClosingStats({
+        totalSales,
+        cashSales,
+        nonCashSales,
+        expenses: totalExpenses,
+        cashToDeposit,
+      });
+
+      // Check if closing already exists
+      const { data: existingClosing } = await supabase
+        .from('daily_closings')
+        .select('*')
+        .eq('outlet_id', reportOutletId)
+        .eq('closing_date', closingDate)
+        .single();
+
+      if (existingClosing) {
+        setClosingData(existingClosing);
+        setActualCash(String(existingClosing.closing_cash));
+        setClosingNotes(existingClosing.notes || '');
+      } else {
+        setClosingData(null);
+        setActualCash('');
+        setClosingNotes('');
+      }
+
+      setShowClosingDialog(true);
+    } catch (error) {
+      console.error('Error fetching closing data:', error);
+      toast({ title: 'Error', description: 'Gagal mengambil data closing', variant: 'destructive' });
+    }
+  };
+
+  const handleSaveClosing = async () => {
+    if (!reportOutletId || reportOutletId === 'all') return;
+    if (!actualCash) {
+      toast({ title: 'Error', description: 'Masukkan jumlah uang fisik (aktual)', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const actual = parseFloat(actualCash);
+      const discrepancy = actual - closingStats.cashToDeposit;
+
+      const closingPayload = {
+        outlet_id: reportOutletId,
+        closing_date: closingDate,
+        total_sales: closingStats.totalSales,
+        cash_sales: closingStats.cashSales,
+        total_expenses: closingStats.expenses,
+        cash_to_deposit: closingStats.cashToDeposit,
+        closing_cash: actual,
+        discrepancy,
+        notes: closingNotes,
+      };
+
+      if (closingData) {
+        // Update
+        await supabase
+          .from('daily_closings')
+          .update(closingPayload)
+          .eq('id', closingData.id);
+        toast({ title: 'Berhasil', description: 'Laporan closing berhasil diperbarui' });
+      } else {
+        // Insert
+        await supabase
+          .from('daily_closings')
+          .insert(closingPayload);
+        toast({ title: 'Berhasil', description: 'Laporan closing berhasil disimpan' });
+      }
+      setShowClosingDialog(false);
+    } catch (error: any) {
+      console.error('Error saving closing:', error);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const profitMargin = stats.totalSales > 0 ? (stats.netProfit / stats.totalSales) * 100 : 0;
 
   return (
@@ -325,7 +518,7 @@ export default function Reports() {
                 ))}
               </SelectContent>
             </Select>
-            
+
             {/* Period Selector */}
             <Select value={period} onValueChange={setPeriod}>
               <SelectTrigger className="w-40">
@@ -337,7 +530,7 @@ export default function Reports() {
                 <SelectItem value="year">Tahun Ini</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Button onClick={handleDownloadPDF} disabled={generating || loading}>
               {generating ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -345,6 +538,11 @@ export default function Reports() {
                 <FileDown className="h-4 w-4 mr-2" />
               )}
               {generating ? 'Generating...' : 'Download PDF'}
+            </Button>
+
+            <Button variant="outline" onClick={fetchClosingData} disabled={reportOutletId === 'all'}>
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Closing Harian
             </Button>
           </div>
         </div>
@@ -446,6 +644,42 @@ export default function Reports() {
           </Card>
         </div>
 
+        {/* Deposit Calculation Card */}
+        <Card className="card-warm border-blue-200 bg-blue-50/50">
+          <CardHeader>
+            <CardTitle className="font-display flex items-center gap-2 text-blue-800">
+              <DollarSign className="h-5 w-5" />
+              Perhitungan Setoran Tunai (Cash Deposit)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-white rounded-lg border shadow-sm">
+                <p className="text-sm text-muted-foreground mb-1">Total Penjualan Tunai</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(stats.salesByPayment.find(p => p.method === 'cash')?.total || 0)}
+                </p>
+              </div>
+              <div className="flex items-center justify-center">
+                <div className="bg-white p-2 rounded-full border shadow-sm">
+                  <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="p-4 bg-white rounded-lg border shadow-sm">
+                <p className="text-sm text-muted-foreground mb-1">Total Pengeluaran (Expenses)</p>
+                <p className="text-xl font-bold text-red-600">{formatCurrency(stats.totalExpenses)}</p>
+              </div>
+              <div className="p-4 bg-blue-100 rounded-lg border border-blue-200">
+                <p className="text-sm font-semibold text-blue-800 mb-1">Total Cash Setor</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(stats.cashToDeposit)}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">Cash Sales - Expenses</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Products */}
           <Card className="card-warm">
@@ -528,7 +762,7 @@ export default function Reports() {
                       <span className="font-semibold text-blue-600">{formatCurrency(stats.totalSales)}</span>
                     </div>
                     <div className="w-full h-8 bg-muted rounded overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-blue-500 transition-all duration-500 flex items-center justify-end pr-2"
                         style={{ width: `${stats.totalSales > 0 ? 100 : 0}%` }}
                       >
@@ -544,7 +778,7 @@ export default function Reports() {
                       <span className="font-semibold text-orange-600">{formatCurrency(stats.cogs)}</span>
                     </div>
                     <div className="w-full h-8 bg-muted rounded overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-orange-500 transition-all duration-500 flex items-center justify-end pr-2"
                         style={{ width: `${stats.totalSales > 0 ? (stats.cogs / stats.totalSales * 100) : 0}%` }}
                       >
@@ -562,7 +796,7 @@ export default function Reports() {
                       <span className="font-semibold text-red-600">{formatCurrency(stats.totalExpenses)}</span>
                     </div>
                     <div className="w-full h-8 bg-muted rounded overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-red-500 transition-all duration-500 flex items-center justify-end pr-2"
                         style={{ width: `${stats.totalSales > 0 ? (stats.totalExpenses / stats.totalSales * 100) : 0}%` }}
                       >
@@ -580,7 +814,7 @@ export default function Reports() {
                       <span className="font-semibold text-green-600">{formatCurrency(stats.grossProfit)}</span>
                     </div>
                     <div className="w-full h-8 bg-muted rounded overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-green-500 transition-all duration-500 flex items-center justify-end pr-2"
                         style={{ width: `${stats.totalSales > 0 ? (stats.grossProfit / stats.totalSales * 100) : 0}%` }}
                       >
@@ -600,10 +834,9 @@ export default function Reports() {
                       </span>
                     </div>
                     <div className="w-full h-8 bg-muted rounded overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 flex items-center justify-end pr-2 ${
-                          stats.netProfit >= 0 ? 'bg-emerald-600' : 'bg-red-600'
-                        }`}
+                      <div
+                        className={`h-full transition-all duration-500 flex items-center justify-end pr-2 ${stats.netProfit >= 0 ? 'bg-emerald-600' : 'bg-red-600'
+                          }`}
                         style={{ width: `${stats.totalSales > 0 ? Math.abs(stats.netProfit / stats.totalSales * 100) : 0}%` }}
                       >
                         <span className="text-xs text-white font-medium">
@@ -634,6 +867,101 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+      {/* Daily Closing Dialog */}
+      <Dialog open={showClosingDialog} onOpenChange={setShowClosingDialog}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">Laporan Closing Harian</DialogTitle>
+            <DialogDescription>
+              {getSelectedOutletName()} - {new Date(closingDate).toLocaleDateString('id-ID', { dateStyle: 'full' })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-4 col-span-2 md:col-span-1">
+              <div className="space-y-2">
+                <Label>Tanggal Closing</Label>
+                <Input
+                  type="date"
+                  value={closingDate}
+                  onChange={(e) => setClosingDate(e.target.value)}
+                />
+                <Button size="sm" variant="secondary" className="w-full mt-1" onClick={fetchClosingData}>
+                  Reload Data
+                </Button>
+              </div>
+
+              <div className="p-3 bg-muted rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Total Penjualan:</span>
+                  <span className="font-medium">{formatCurrency(closingStats.totalSales)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tunai (Cash):</span>
+                  <span className="font-medium text-green-600">{formatCurrency(closingStats.cashSales)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Non-Tunai:</span>
+                  <span className="font-medium text-blue-600">{formatCurrency(closingStats.nonCashSales)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span>Pengeluaran:</span>
+                  <span className="font-medium text-red-600">-{formatCurrency(closingStats.expenses)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 col-span-2 md:col-span-1">
+              <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                <h4 className="font-semibold text-primary mb-2">Target Setoran</h4>
+                <div className="text-3xl font-bold text-primary">{formatCurrency(closingStats.cashToDeposit)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Cash Sales - Expenses</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="actualCash">Uang Fisik Diterima</Label>
+                <Input
+                  id="actualCash"
+                  type="number"
+                  placeholder="0"
+                  value={actualCash}
+                  onChange={(e) => setActualCash(e.target.value)}
+                  className="font-semibold"
+                />
+              </div>
+
+              {actualCash && (
+                <div className={`p-2 rounded text-sm flex justify-between ${parseFloat(actualCash) - closingStats.cashToDeposit === 0
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                  <span>Selisih:</span>
+                  <span className="font-bold">
+                    {formatCurrency(parseFloat(actualCash) - closingStats.cashToDeposit)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="col-span-2 space-y-2">
+              <Label>Catatan</Label>
+              <Textarea
+                placeholder="Catatan tambahan..."
+                value={closingNotes}
+                onChange={(e) => setClosingNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClosingDialog(false)}>Batal</Button>
+            <Button onClick={handleSaveClosing}>
+              <Save className="h-4 w-4 mr-2" />
+              Simpan Closing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, Store, RefreshCw } from 'lucide-react';
+import { Plus, Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, Store, RefreshCw, ClipboardList } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface WarehouseItem {
@@ -53,10 +53,14 @@ export default function WarehousePage() {
     const [receiveCost, setReceiveCost] = useState('');
     const [receiveSupplier, setReceiveSupplier] = useState('');
 
-    // Transfer to store form
     const [transferProduct, setTransferProduct] = useState('');
     const [transferQuantity, setTransferQuantity] = useState('');
     const [transferDestination, setTransferDestination] = useState('');
+
+    // Stock Opname
+    const [showOpnameDialog, setShowOpnameDialog] = useState(false);
+    const [opnameItems, setOpnameItems] = useState<any[]>([]);
+    const [opnameNote, setOpnameNote] = useState('');
 
     // Products and outlets for dropdowns
     const [products, setProducts] = useState<any[]>([]);
@@ -273,6 +277,66 @@ export default function WarehousePage() {
         }
     };
 
+    const handleOpenOpname = () => {
+        if (!selectedWarehouse) return;
+        // Initialize opname items with current inventory
+        const items = inventory.map(item => ({
+            product_id: item.product_id,
+            product_name: item.product_name,
+            system_qty: item.quantity,
+            actual_qty: item.quantity, // Default to system qty
+            notes: ''
+        }));
+        setOpnameItems(items);
+        setOpnameNote('');
+        setShowOpnameDialog(true);
+    };
+
+    const handleOpnameChange = (index: number, field: string, value: any) => {
+        const newItems = [...opnameItems];
+        newItems[index] = { ...newItems[index], [field]: value };
+        setOpnameItems(newItems);
+    };
+
+    const handleSaveOpname = async () => {
+        if (!selectedWarehouse) return;
+
+        try {
+            // 1. Create Opname Record
+            const { data: opnameRef, error: opnameError } = await (supabase as any)
+                .from('stock_opnames')
+                .insert({
+                    warehouse_id: selectedWarehouse.id,
+                    opname_date: new Date().toISOString().split('T')[0],
+                    status: 'completed',
+                    items: opnameItems,
+                    notes: opnameNote
+                })
+                .select()
+                .single();
+
+            if (opnameError) throw opnameError;
+
+            // 2. Adjust Stock
+            for (const item of opnameItems) {
+                if (parseFloat(item.actual_qty) !== item.system_qty) {
+                    await (supabase as any)
+                        .from('warehouse_inventory')
+                        .update({ quantity: parseFloat(item.actual_qty) })
+                        .eq('warehouse_id', selectedWarehouse.id)
+                        .eq('product_id', item.product_id);
+                }
+            }
+
+            toast({ title: 'Berhasil', description: 'Stock Opname berhasil disimpan dan stok disesuaikan' });
+            setShowOpnameDialog(false);
+            fetchWarehouseInventory(selectedWarehouse.id);
+        } catch (error: any) {
+            console.error('Error saving opname:', error);
+            toast({ title: 'Error', description: 'Gagal menimpan Stock Opname', variant: 'destructive' });
+        }
+    };
+
     const filteredInventory = inventory.filter(item =>
         item.product_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -299,6 +363,10 @@ export default function WarehousePage() {
                             <Button onClick={() => setShowTransferDialog(true)}>
                                 <ArrowRight className="h-4 w-4 mr-2" />
                                 Transfer ke Toko
+                            </Button>
+                            <Button variant="secondary" onClick={handleOpenOpname}>
+                                <ClipboardList className="h-4 w-4 mr-2" />
+                                Stock Opname
                             </Button>
                         </div>
                     )}
@@ -531,6 +599,84 @@ export default function WarehousePage() {
                         <Button onClick={handleTransferToStore}>
                             <ArrowRight className="h-4 w-4 mr-2" />
                             Transfer Stok
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Stock Opname Dialog */}
+            <Dialog open={showOpnameDialog} onOpenChange={setShowOpnameDialog}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="font-display">Stock Opname Gudang</DialogTitle>
+                        <DialogDescription>
+                            Sesuaikan stok fisik dengan sistem. Stok di sistem akan diperbarui otomatis.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="flex justify-between items-center text-sm bg-muted p-2 rounded">
+                            <span>Gudang: <strong>{selectedWarehouse?.name}</strong></span>
+                            <span>Tanggal: <strong>{new Date().toLocaleDateString('id-ID')}</strong></span>
+                        </div>
+
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Produk</TableHead>
+                                        <TableHead className="w-24">Stok Sistem</TableHead>
+                                        <TableHead className="w-32">Stok Fisik</TableHead>
+                                        <TableHead className="w-24">Selisih</TableHead>
+                                        <TableHead>Keterangan</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {opnameItems.map((item, index) => {
+                                        const diff = parseFloat(item.actual_qty || 0) - item.system_qty;
+                                        return (
+                                            <TableRow key={item.product_id}>
+                                                <TableCell className="font-medium">{item.product_name}</TableCell>
+                                                <TableCell>{item.system_qty}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        value={item.actual_qty}
+                                                        onChange={(e) => handleOpnameChange(index, 'actual_qty', e.target.value)}
+                                                        className="h-8"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={diff !== 0 ? (diff < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold') : 'text-gray-400'}>
+                                                        {diff > 0 ? `+${diff}` : diff}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={item.notes}
+                                                        onChange={(e) => handleOpnameChange(index, 'notes', e.target.value)}
+                                                        placeholder="Alasan selisih..."
+                                                        className="h-8"
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Catatan Umum Opname</Label>
+                            <Input value={opnameNote} onChange={(e) => setOpnameNote(e.target.value)} placeholder="Catatan tambahan..." />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowOpnameDialog(false)}>Batal</Button>
+                        <Button onClick={handleSaveOpname}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Simpan & Update Stok
                         </Button>
                     </DialogFooter>
                 </DialogContent>

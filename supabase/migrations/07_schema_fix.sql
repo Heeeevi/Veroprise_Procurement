@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_shifts_user ON pos_shifts(user_id);
 CREATE INDEX IF NOT EXISTS idx_pos_shifts_active ON pos_shifts(outlet_id, user_id) WHERE ended_at IS NULL;
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_pos_shifts_updated_at ON pos_shifts;
 CREATE TRIGGER update_pos_shifts_updated_at 
     BEFORE UPDATE ON pos_shifts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

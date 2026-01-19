@@ -72,7 +72,36 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       setCurrentShift(data as unknown as Shift);
-      toast({ title: 'Shift dimulai', description: 'Selamat bekerja!' });
+
+      // Auto-attendance: Check if user is an employee and create attendance record
+      // 1. Find employee record for this user
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('outlet_id', selectedOutlet.id)
+        .single();
+
+      if (employee) {
+        // 2. Create attendance
+        const { error: attError } = await supabase
+          .from('attendances')
+          .insert({
+            outlet_id: selectedOutlet.id,
+            employee_id: employee.id,
+            shift_id: data.id,
+            attendance_date: new Date().toISOString().split('T')[0],
+            check_in: new Date().toISOString(),
+            status: 'present',
+          });
+
+        if (attError) {
+          console.error('Error creating linked attendance:', attError);
+          // Don't fail the shift start just because attendance failed, but maybe warn?
+        }
+      }
+
+      toast({ title: 'Shift dimulai', description: 'Selamat bekerja! Absensi telah dicatat.' });
       return true;
     } catch (error) {
       console.error('Error starting shift:', error);
@@ -98,6 +127,23 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         .eq('id', currentShift.id);
 
       if (error) throw error;
+
+      // Auto-attendance: Clock out
+      // Find attendance linked to this shift
+      const { data: attendance } = await supabase
+        .from('attendances')
+        .select('id')
+        .eq('shift_id', currentShift.id)
+        .single();
+
+      if (attendance) {
+        await supabase
+          .from('attendances')
+          .update({
+            check_out: new Date().toISOString()
+          })
+          .eq('id', attendance.id);
+      }
 
       setCurrentShift(null);
       toast({ title: 'Shift selesai', description: 'Terima kasih atas kerja kerasnya!' });
