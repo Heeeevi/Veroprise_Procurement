@@ -12,9 +12,15 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Search, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, QrCode, Clock } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, QrCode, Clock, Store, Split } from 'lucide-react';
 import { ReceiptPrinter, type ReceiptData } from '@/components/receipt';
 import type { Product, Category, CartItem, PaymentMethod } from '@/types/database';
+import { Checkbox } from '@/components/ui/checkbox';
+
+interface PaymentSplit {
+  method: PaymentMethod | 'olshop';
+  amount: number;
+}
 
 export default function POS() {
   const { user } = useAuth();
@@ -35,8 +41,13 @@ export default function POS() {
   const [showEndShiftDialog, setShowEndShiftDialog] = useState(false);
   const [openingCash, setOpeningCash] = useState('');
   const [closingCash, setClosingCash] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | 'olshop'>('cash');
   const [processing, setProcessing] = useState(false);
+
+  // Multi-payment support
+  const [isMultiPayment, setIsMultiPayment] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>([]);
+  const [currentSplitAmount, setCurrentSplitAmount] = useState('');
 
   // Tax rate (percentage, default 0)
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -131,6 +142,15 @@ export default function POS() {
       return;
     }
 
+    // Validate multi-payment total
+    if (isMultiPayment) {
+      const paidTotal = paymentSplits.reduce((sum, s) => sum + s.amount, 0);
+      if (paidTotal < total) {
+        toast({ title: 'Error', description: 'Total pembayaran belum mencukupi', variant: 'destructive' });
+        return;
+      }
+    }
+
     setProcessing(true);
     try {
       // Generate unique transaction number: TRX-YYYYMMDD-HHMMSS-RANDOM
@@ -140,8 +160,14 @@ export default function POS() {
       const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
       const transactionNumber = `TRX-${dateStr}-${timeStr}-${randomStr}`;
 
+      // Prepare payment data
+      const finalPaymentMethod = isMultiPayment ? 'split' : paymentMethod;
+      const paymentDetails = isMultiPayment
+        ? paymentSplits
+        : [{ method: paymentMethod, amount: total }];
+
       // Create transaction
-      const { data: transaction, error: txError } = await supabase
+      const { data: transaction, error: txError } = await (supabase as any)
         .from('transactions')
         .insert({
           outlet_id: selectedOutlet.id,
@@ -149,7 +175,9 @@ export default function POS() {
           subtotal,
           tax,
           total,
-          payment_method: paymentMethod,
+          payment_method: finalPaymentMethod,
+          payment_details: paymentDetails,
+          is_split_payment: isMultiPayment,
           transaction_number: transactionNumber,
         })
         .select()
@@ -426,8 +454,15 @@ export default function POS() {
       </div>
 
       {/* Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
+      <Dialog open={showPaymentDialog} onOpenChange={(open) => {
+        setShowPaymentDialog(open);
+        if (!open) {
+          setIsMultiPayment(false);
+          setPaymentSplits([]);
+          setCurrentSplitAmount('');
+        }
+      }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">Metode Pembayaran</DialogTitle>
           </DialogHeader>
@@ -437,52 +472,153 @@ export default function POS() {
               <p className="text-3xl font-bold text-primary">{formatCurrency(total)}</p>
             </div>
 
-            <RadioGroup value={paymentMethod} onValueChange={(v) => {
-              setPaymentMethod(v as PaymentMethod);
-              setCashReceived('');
-            }} className="space-y-3">
-              <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="cash" />
-                <Banknote className="h-5 w-5" />
-                <span className="font-medium">Cash</span>
-              </label>
-              <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="qris" />
-                <QrCode className="h-5 w-5" />
-                <span className="font-medium">QRIS</span>
-              </label>
-              <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="transfer" />
-                <CreditCard className="h-5 w-5" />
-                <span className="font-medium">Transfer Bank</span>
-              </label>
-            </RadioGroup>
+            {/* Multi-payment Toggle */}
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Split className="h-4 w-4" />
+                <span className="text-sm font-medium">Split Payment (DP + Pelunasan)</span>
+              </div>
+              <Checkbox
+                checked={isMultiPayment}
+                onCheckedChange={(checked) => {
+                  setIsMultiPayment(!!checked);
+                  setPaymentSplits([]);
+                  setCurrentSplitAmount('');
+                }}
+              />
+            </div>
 
-            {/* Cash Payment Input */}
-            {paymentMethod === 'cash' && (
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
-                <div className="space-y-2">
-                  <Label htmlFor="cashReceived">Uang Diterima</Label>
-                  <Input
-                    id="cashReceived"
-                    type="number"
-                    placeholder="0"
-                    value={cashReceived}
-                    onChange={(e) => setCashReceived(e.target.value)}
-                    className="text-lg font-semibold"
-                    min={total}
-                  />
-                </div>
-                {cashReceived && parseFloat(cashReceived) >= total && (
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                    <span className="text-sm font-medium">Kembalian:</span>
-                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(cashChange)}
-                    </span>
+            {!isMultiPayment ? (
+              /* Single Payment Mode */
+              <>
+                <RadioGroup value={paymentMethod} onValueChange={(v) => {
+                  setPaymentMethod(v as PaymentMethod | 'olshop');
+                  setCashReceived('');
+                }} className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                    <RadioGroupItem value="cash" />
+                    <Banknote className="h-5 w-5" />
+                    <span className="font-medium">Cash</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                    <RadioGroupItem value="qris" />
+                    <QrCode className="h-5 w-5" />
+                    <span className="font-medium">QRIS</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                    <RadioGroupItem value="transfer" />
+                    <CreditCard className="h-5 w-5" />
+                    <span className="font-medium">Transfer Bank</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                    <RadioGroupItem value="olshop" />
+                    <Store className="h-5 w-5" />
+                    <span className="font-medium">Olshop (Shopee/Tokopedia)</span>
+                  </label>
+                </RadioGroup>
+
+                {/* Cash Payment Input */}
+                {paymentMethod === 'cash' && (
+                  <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                    <div className="space-y-2">
+                      <Label htmlFor="cashReceived">Uang Diterima</Label>
+                      <Input
+                        id="cashReceived"
+                        type="number"
+                        placeholder="0"
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        className="text-lg font-semibold"
+                        min={total}
+                      />
+                    </div>
+                    {cashReceived && parseFloat(cashReceived) >= total && (
+                      <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                        <span className="text-sm font-medium">Kembalian:</span>
+                        <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                          {formatCurrency(cashChange)}
+                        </span>
+                      </div>
+                    )}
+                    {cashReceived && parseFloat(cashReceived) < total && (
+                      <p className="text-sm text-destructive">Uang tidak cukup</p>
+                    )}
                   </div>
                 )}
-                {cashReceived && parseFloat(cashReceived) < total && (
-                  <p className="text-sm text-destructive">Uang tidak cukup</p>
+              </>
+            ) : (
+              /* Multi-payment Mode */
+              <div className="space-y-4">
+                {/* Current Splits */}
+                {paymentSplits.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Pembayaran Tercatat:</p>
+                    {paymentSplits.map((split, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border">
+                        <span className="capitalize">{split.method}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{formatCurrency(split.amount)}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setPaymentSplits(prev => prev.filter((_, i) => i !== idx))}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span>Total Dibayar:</span>
+                      <span className="font-semibold">{formatCurrency(paymentSplits.reduce((sum, s) => sum + s.amount, 0))}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Sisa:</span>
+                      <span className="font-semibold text-orange-600">{formatCurrency(total - paymentSplits.reduce((sum, s) => sum + s.amount, 0))}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Payment Split */}
+                {paymentSplits.reduce((sum, s) => sum + s.amount, 0) < total && (
+                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+                    <p className="text-sm font-medium">Tambah Pembayaran:</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['cash', 'qris', 'transfer', 'olshop'].map(method => (
+                        <Button
+                          key={method}
+                          variant={paymentMethod === method ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPaymentMethod(method as any)}
+                          className="text-xs capitalize"
+                        >
+                          {method}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Jumlah"
+                        value={currentSplitAmount}
+                        onChange={(e) => setCurrentSplitAmount(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={() => {
+                          const amount = parseFloat(currentSplitAmount);
+                          if (amount > 0) {
+                            setPaymentSplits(prev => [...prev, { method: paymentMethod, amount }]);
+                            setCurrentSplitAmount('');
+                          }
+                        }}
+                        disabled={!currentSplitAmount || parseFloat(currentSplitAmount) <= 0}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
