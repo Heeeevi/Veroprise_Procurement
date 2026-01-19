@@ -34,19 +34,26 @@ export default function StockNotifications() {
 
     const fetchLowStockItems = async () => {
         try {
-            // Get inventory items where current_stock <= min_stock
-            const { data, error } = await supabase
-                .from('inventory_items')
-                .select('id, name, current_stock, min_stock, unit')
+            // Get products where stock_quantity <= min_stock
+            const { data, error } = await (supabase as any)
+                .from('products')
+                .select('id, name, stock_quantity, min_stock')
                 .gt('min_stock', 0) // Only items with min_stock set
+                .eq('is_active', true)
                 .order('name');
 
             if (error) throw error;
 
-            // Filter in JS where current_stock <= min_stock
+            // Filter in JS where stock_quantity <= min_stock
             const lowItems = (data || []).filter(
-                (item) => Number(item.current_stock) <= Number(item.min_stock)
-            );
+                (item: any) => Number(item.stock_quantity) <= Number(item.min_stock)
+            ).map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                current_stock: item.stock_quantity,
+                min_stock: item.min_stock,
+                unit: 'pcs'
+            }));
 
             setLowStockItems(lowItems);
         } catch (error) {
@@ -104,18 +111,18 @@ export default function StockNotifications() {
                                     <div
                                         key={item.id}
                                         className={`p-3 flex items-center gap-3 ${level === 'empty'
-                                                ? 'bg-red-50 dark:bg-red-950/20'
-                                                : level === 'critical'
-                                                    ? 'bg-amber-50 dark:bg-amber-950/20'
-                                                    : 'bg-background'
+                                            ? 'bg-red-50 dark:bg-red-950/20'
+                                            : level === 'critical'
+                                                ? 'bg-amber-50 dark:bg-amber-950/20'
+                                                : 'bg-background'
                                             }`}
                                     >
                                         <div
                                             className={`w-2 h-2 rounded-full ${level === 'empty'
-                                                    ? 'bg-red-500'
-                                                    : level === 'critical'
-                                                        ? 'bg-amber-500'
-                                                        : 'bg-yellow-500'
+                                                ? 'bg-red-500'
+                                                : level === 'critical'
+                                                    ? 'bg-amber-500'
+                                                    : 'bg-yellow-500'
                                                 }`}
                                         />
                                         <div className="flex-1 min-w-0">

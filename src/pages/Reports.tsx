@@ -348,9 +348,9 @@ export default function Reports() {
 
       await generateReportPDF(reportData);
       toast({ title: 'Berhasil', description: 'Laporan PDF berhasil diunduh (2 halaman)' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating PDF:', error);
-      toast({ title: 'Error', description: 'Gagal membuat PDF', variant: 'destructive' });
+      toast({ title: 'Error', description: `Gagal membuat PDF: ${error?.message || 'Unknown error'}`, variant: 'destructive' });
     } finally {
       setGenerating(false);
     }

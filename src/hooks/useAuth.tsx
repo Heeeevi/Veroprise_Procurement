@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async (userId: string) => {
     try {
       // Fetch profile (role is in profiles table)
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await (supabase as any)
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -74,13 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching profile:', profileError);
       }
 
+      console.log('Profile data fetched:', profileData); // Debug log
+
       if (profileData) {
         setProfile(profileData as unknown as Profile);
-        // Set role from profile (force type because schema not updated yet)
-        const profileWithRole = profileData as any;
-        if (profileWithRole.role) {
-          setRole(profileWithRole.role as AppRole);
-        }
+        // Always set role from profile (can be null)
+        const roleValue = profileData.role as AppRole | null;
+        console.log('Setting role to:', roleValue); // Debug log
+        setRole(roleValue);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
