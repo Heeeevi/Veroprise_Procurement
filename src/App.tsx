@@ -17,6 +17,7 @@ import Vendors from "./pages/Vendors";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
 import HRPage from "./pages/HR";
+import Warehouse from "./pages/Warehouse";
 import Reports from "./pages/Reports";
 import Users from "./pages/Users";
 // BOOKING FEATURE DISABLED
@@ -52,6 +53,7 @@ const App = () => (
                 <Route path="/inventory/vendors" element={<Vendors />} />
                 <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
                 <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+                <Route path="/warehouse" element={<Warehouse />} />
                 <Route path="/hr" element={<HRPage />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<Users />} />

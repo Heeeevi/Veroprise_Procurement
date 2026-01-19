@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import {
   Coffee, LayoutDashboard, ShoppingCart, Package, Receipt,
-  Users, BarChart3, LogOut, Menu, ChevronDown, Store, Calendar, Tag, Settings
+  Users, BarChart3, LogOut, Menu, ChevronDown, Store, Calendar, Tag, Settings, Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +28,7 @@ const menuItems = [
   // { icon: Calendar, label: 'Booking', href: '/bookings', roles: ['owner', 'manager', 'staff'] },
   { icon: Tag, label: 'Produk & Layanan', href: '/products', roles: ['owner', 'manager'] },
   { icon: Package, label: 'Inventory', href: '/inventory', roles: ['owner', 'manager', 'staff'] },
+  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['owner', 'manager'] },
   { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
   { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['owner', 'manager'] },
   { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
@@ -98,7 +99,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
             <div>
               <h1 className="font-display text-lg font-semibold">Veroprise ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Whistleblow Entreprise Management</p>
+              <p className="text-xs text-sidebar-foreground/70">Whistleblower Entreprise Management</p>
             </div>
           </Link>
         </div>
