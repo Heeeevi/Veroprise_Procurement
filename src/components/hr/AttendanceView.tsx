@@ -58,7 +58,8 @@ export default function AttendanceView() {
         if (!newLog.employee_id) return;
 
         try {
-            const { error } = await (supabase as any).from('attendances').insert({
+            // Use upsert to update existing record if employee already has attendance for this date
+            const { error } = await (supabase as any).from('attendances').upsert({
                 outlet_id: selectedOutlet?.id,
                 employee_id: newLog.employee_id,
                 attendance_date: dateFilter,
@@ -66,11 +67,12 @@ export default function AttendanceView() {
                 check_in: newLog.clock_in ? `${dateFilter}T${newLog.clock_in}:00` : null,
                 check_out: newLog.clock_out ? `${dateFilter}T${newLog.clock_out}:00` : null,
                 notes: newLog.notes
-            });
+            }, { onConflict: 'employee_id,attendance_date' });
 
             if (error) throw error;
-            toast({ title: 'Success', description: 'Attendance logged' });
+            toast({ title: 'Success', description: 'Absensi berhasil disimpan' });
             setShowLogDialog(false);
+            setNewLog({ employee_id: '', status: 'present', clock_in: '', clock_out: '', notes: '' });
             fetchLogs();
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
