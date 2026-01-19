@@ -117,8 +117,8 @@ export default function AttendanceView() {
                                         {log.status}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{log.clock_in ? new Date(log.clock_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
-                                <TableCell>{log.clock_out ? new Date(log.clock_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                                <TableCell>{log.check_in ? new Date(log.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                                <TableCell>{log.check_out ? new Date(log.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
                                 <TableCell>{log.notes || '-'}</TableCell>
                             </TableRow>
                         ))
