@@ -120,7 +120,7 @@ export default function WelcomeTour() {
                     <div className="flex items-center gap-2 mb-4">
                         <Sparkles className="h-5 w-5" />
                         <span className="text-sm font-medium opacity-90">
-                            Selamat Datang di BarberDoc ERP!
+                            Selamat Datang di Veroprise ERP!
                         </span>
                     </div>
                     <div className="flex items-center gap-4">

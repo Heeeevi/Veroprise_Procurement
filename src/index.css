@@ -1,4 +1,4 @@
-/* BarberDoc ERP - Professional Barbershop Design System */
+/* Veroprise ERP - Professional Enterprise Design System */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -8,7 +8,8 @@
 @layer base {
   :root {
     /* BarberDoc Theme - sleek, modern blue/purple */
-    --background: 222 47% 98%; /* Cool white */
+    --background: 222 47% 98%;
+    /* Cool white */
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -18,7 +19,8 @@
     --popover-foreground: 222 47% 11%;
 
     /* Primary - Royal Purple/Blue gradient feel */
-    --primary: 262 83% 58%; /* Vivid Purple */
+    --primary: 262 83% 58%;
+    /* Vivid Purple */
     --primary-foreground: 210 40% 98%;
 
     /* Secondary - Soft Blue */
@@ -30,7 +32,7 @@
     --muted-foreground: 215.4 16.3% 46.9%;
 
     /* Accent - Electric Blue/Cyan for tech feel */
-    --accent: 199 89% 48%; 
+    --accent: 199 89% 48%;
     --accent-foreground: 222 47% 11.2%;
 
     /* Destructive - Red */
@@ -56,18 +58,20 @@
 
     /* Custom Colors for BarberDoc Dashboard */
     --brand-primary: 262 83% 58%;
-    --brand-secondary: 200 95% 45%; 
+    --brand-secondary: 200 95% 45%;
     --brand-dark: 222 47% 11%;
     --brand-light: 210 40% 98%;
-    
+
     /* Legacy variables mapping for compatibility */
     --coffee-dark: 222 47% 11%;
     --coffee-medium: 217 33% 17%;
     --coffee-light: 210 40% 96%;
     --cream: 222 100% 99%;
-    --sage: 199 89% 48%; /* Mapped to accent */
+    --sage: 199 89% 48%;
+    /* Mapped to accent */
     --sage-dark: 199 89% 38%;
-    --caramel: 262 83% 68%; /* Mapped to primary light */
+    --caramel: 262 83% 68%;
+    /* Mapped to primary light */
     --mocha: 222 47% 25%;
 
     /* Status Colors */
@@ -79,13 +83,15 @@
     --info-foreground: 210 40% 98%;
 
     /* Gradients */
-    --gradient-warm: linear-gradient(135deg, hsl(210 40% 98%) 0%, hsl(220 30% 94%) 100%); /* Cool background */
-    --gradient-coffee: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(200 95% 45%) 100%); /* Brand Gradient (Purple to Blue) */
+    --gradient-warm: linear-gradient(135deg, hsl(210 40% 98%) 0%, hsl(220 30% 94%) 100%);
+    /* Cool background */
+    --gradient-coffee: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(200 95% 45%) 100%);
+    /* Brand Gradient (Purple to Blue) */
     --gradient-sage: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(200 80% 60%) 100%);
 
     /* Shadows */
     --shadow-soft: 0 2px 10px -2px rgba(0, 0, 0, 0.05);
-    --shadow-medium: 0 4px 20px -4px rgba(99, 102, 241, 0.1); 
+    --shadow-medium: 0 4px 20px -4px rgba(99, 102, 241, 0.1);
     --shadow-strong: 0 8px 30px -8px rgba(99, 102, 241, 0.2);
   }
 
@@ -126,7 +132,7 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
     --sidebar-ring: 262 83% 64%;
-    
+
     /* Legacy mapping for Dark Mode */
     --coffee-dark: 222 47% 8%;
     --coffee-medium: 217 33% 25%;
@@ -136,7 +142,7 @@
     --sage-dark: 199 89% 38%;
     --caramel: 262 83% 64%;
     --mocha: 222 47% 25%;
-    
+
     --success: 142 70% 50%;
     --success-foreground: 144 17% 14%;
     --warning: 48 96% 89%;
@@ -156,13 +162,19 @@
     font-family: 'Source Sans 3', system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Playfair Display', serif;
     @apply font-semibold tracking-tight;
   }
 }
 
 @layer components {
+
   /* POS Button Styles for Tablet */
   .pos-btn {
     @apply p-4 rounded-xl font-medium transition-all duration-200 active:scale-95 touch-manipulation;

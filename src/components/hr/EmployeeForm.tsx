@@ -86,7 +86,7 @@ export default function EmployeeForm({ onSuccess }: { onSuccess: () => void }) {
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Jabatan *</Label>
-                    <Input required value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} placeholder="e.g. Barber, Kasir" />
+                    <Input required value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} placeholder="e.g. Operational, Kasir" />
                 </div>
                 <div className="space-y-2">
                     <Label>Gaji Pokok</Label>

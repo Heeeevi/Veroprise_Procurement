@@ -65,7 +65,7 @@ export default function Auth() {
           </div>
           <div>
             <CardTitle className="text-2xl font-display">Veroprise ERP</CardTitle>
-            <CardDescription>Barbershop Management System</CardDescription>
+            <CardDescription>Enterprise Resource Planning</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

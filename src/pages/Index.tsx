@@ -139,7 +139,7 @@ export default function Index() {
             </div>
             <div>
               <h1 className="font-display text-xl font-semibold">Veroprise ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Barbershop Management</p>
+              <p className="text-xs text-sidebar-foreground/70">Enterprise Resource Planning</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

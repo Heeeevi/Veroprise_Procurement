@@ -119,7 +119,7 @@ export default function AIInsightsPanel() {
                     <Sparkles className="h-5 w-5 text-purple-500" />
                     <h2 className="font-display text-lg font-semibold">AI Insights</h2>
                     <Badge variant="secondary" className="text-xs">
-                        Powered by BarberDoc AI
+                        Powered by Veroprise AI
                     </Badge>
                 </div>
                 <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing}>
@@ -146,8 +146,8 @@ export default function AIInsightsPanel() {
                                             <Badge
                                                 variant="outline"
                                                 className={`text-xs ${insight.type === 'success' ? 'border-green-300 text-green-700' :
-                                                        insight.type === 'warning' || insight.type === 'alert' ? 'border-amber-300 text-amber-700' :
-                                                            'border-blue-300 text-blue-700'
+                                                    insight.type === 'warning' || insight.type === 'alert' ? 'border-amber-300 text-amber-700' :
+                                                        'border-blue-300 text-blue-700'
                                                     }`}
                                             >
                                                 {insight.metric}

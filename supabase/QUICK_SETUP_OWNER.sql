@@ -53,7 +53,7 @@ BEGIN
     -- Get the outlet we just created
     SELECT id INTO v_outlet_id
     FROM public.outlets
-    WHERE name = 'Veroprise Barbershop - Central'
+    WHERE name = 'Veroprise Warehouse - Central'
     ORDER BY created_at DESC
     LIMIT 1;
     

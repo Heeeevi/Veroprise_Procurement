@@ -242,4 +242,4 @@ Untuk pertanyaan atau issue, hubungi tim development atau buat ticket di reposit
 
 ---
 
-**Built with ❤️ for Barbershop Owners**
+**Built with ❤️ for Business Owners**

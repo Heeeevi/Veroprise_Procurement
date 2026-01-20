@@ -189,7 +189,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </SheetContent>
             </Sheet>
-            <span className="font-display font-semibold">BarberDoc ERP</span>
+            <span className="font-display font-semibold">Veroprise ERP</span>
           </div>
           <div className="flex items-center gap-1">
             <StockNotifications />

@@ -58,14 +58,14 @@ const helpContentMap: Record<string, HelpContent> = {
     },
     '/inventory/vendors': {
         title: '🏪 Vendor / Supplier',
-        description: 'Database supplier dan rekomendasi partner dari BarberDoc.',
+        description: 'Database supplier dan rekomendasi partner dari Veroprise.',
         steps: [
-            { title: 'Lihat Rekomendasi', desc: 'Cek "Rekomendasi Partner BarberDoc" untuk supplier terpercaya' },
+            { title: 'Lihat Rekomendasi', desc: 'Cek "Rekomendasi Partner Veroprise" untuk supplier terpercaya' },
             { title: 'Hubungi Partner', desc: 'Klik WhatsApp atau Website untuk kontak langsung' },
             { title: 'Tambah Vendor', desc: 'Input nama, kontak, dan alamat supplier baru Anda sendiri' },
             { title: 'Kelola Data', desc: 'Edit informasi vendor yang sudah ada' }
         ],
-        tips: ['Partner BarberDoc sudah diverifikasi dan cocok untuk bisnis barbershop', 'Vendor harus ditambahkan dulu sebelum bisa buat Purchase Order']
+        tips: ['Partner Veroprise sudah diverifikasi dan cocok untuk bisnis', 'Vendor harus ditambahkan dulu sebelum bisa buat Purchase Order']
     },
     '/hr': {
         title: '👥 HR & Payroll',
