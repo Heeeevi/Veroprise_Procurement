@@ -1,8 +1,8 @@
-# 🔒 Security Audit Report - BarberDoc ERP
+# 🔒 Security Audit Report - Veroprise ERP
 
 **Audit Date:** January 13, 2026  
 **Auditor:** AI Security Review  
-**Application:** BarberDoc ERP (Barbershop Management System)
+**Application:** Veroprise ERP (Enterprise Business Management System)
 
 ---
 

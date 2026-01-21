@@ -630,7 +630,7 @@ export default function Users() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <CardTitle className="font-display">Daftar Outlet</CardTitle>
-                    <CardDescription>Kelola outlet / cabang barbershop</CardDescription>
+                    <CardDescription>Kelola outlet / cabang bisnis</CardDescription>
                   </div>
                   {isOwner && (
                     <Button onClick={() => {

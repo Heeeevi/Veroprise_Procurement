@@ -1,9 +1,9 @@
-# BarberDoc - Sistem Booking Terintegrasi dengan ERP
+# Veroprise ERP - Sistem Booking Terintegrasi
 
 ## 🎯 Overview
-Sistem booking barbershop yang terintegrasi penuh dengan BarberDoc ERP. Setiap booking yang dikonfirmasi otomatis tercatat di laporan keuangan dan transaksi.
+Sistem booking online yang terintegrasi penuh dengan Veroprise ERP. Setiap booking yang dikonfirmasi otomatis tercatat di laporan keuangan dan transaksi.
 
-### 💰 PENTING: Sistem Deposit Booking
+### 💰 Sistem Deposit Booking
 
 **Booking fee Rp10.000 = DEPOSIT untuk amankan seat/slot saja, BUKAN harga layanan!**
 
@@ -20,7 +20,7 @@ Sistem booking barbershop yang terintegrasi penuh dengan BarberDoc ERP. Setiap b
    - Deposit masuk ke revenue
 
 3. **Customer Datang ke Outlet**
-   - Pilih layanan (misal: Premium Haircut Rp65k)
+   - Pilih layanan (misal: Premium Service Rp65k)
    - Bayar **sisa**: Rp65k - Rp10k = **Rp55k**
    - Staff input di POS
 
@@ -28,23 +28,6 @@ Sistem booking barbershop yang terintegrasi penuh dengan BarberDoc ERP. Setiap b
    - Deposit: Rp10k (dari booking)
    - Sisa: Rp55k (dari POS)
    - **Total: Rp65k** ✅
-
-#### Contoh Skenario:
-
-**Skenario 1: Basic Haircut (Rp35k)**
-- Deposit booking: Rp10.000
-- Bayar di outlet: Rp25.000
-- Total revenue: Rp35.000 ✅
-
-**Skenario 2: Royal Grooming (Rp200k)**
-- Deposit booking: Rp10.000
-- Bayar di outlet: Rp190.000
-- Total revenue: Rp200.000 ✅
-
-**Skenario 3: Customer Cancel**
-- Deposit Rp10k hangus (no refund)
-- Status: `canceled` / `refunded`
-- Revenue tetap tercatat
 
 ---
 
@@ -86,17 +69,10 @@ Sistem booking barbershop yang terintegrasi penuh dengan BarberDoc ERP. Setiap b
 - created_at, updated_at
 ```
 
-### View `booking_stats`
-Agregasi statistik booking per outlet per hari.
-
-### Function `create_public_booking()`
-RPC function untuk public booking tanpa auth.
-
 ## 🚀 Cara Setup
 
 ### 1. Migrasi Database
 ```bash
-cd barberdoc_erp
 # Jalankan migrations (via Supabase CLI atau dashboard)
 # - 20260112_bookings.sql
 # - 20260112_public_booking_function.sql
@@ -104,15 +80,14 @@ cd barberdoc_erp
 
 ### 2. Install & Run ERP
 ```bash
-cd barberdoc_erp
 npm install
 npm run dev
 ```
 
 ### 3. Akses Aplikasi
-- **Customer Booking**: http://localhost:5173/book
-- **Admin Dashboard**: http://localhost:5173/dashboard
-- **Booking Management**: http://localhost:5173/bookings
+- **Customer Booking**: http://localhost:8080/book
+- **Admin Dashboard**: http://localhost:8080/dashboard
+- **Booking Management**: http://localhost:8080/bookings
 
 ## 📋 Workflow
 
@@ -148,60 +123,6 @@ npm run dev
 - Booking revenue masuk ke laporan bulanan
 - Dapat di-export bersama transaksi lain
 
-## 🎨 UI/UX
-
-### Public Booking Page
-- Modern landing page dengan gradient
-- Info kenapa booking online
-- Form di-split jadi 2 kolom (info + form)
-- Mobile responsive
-
-### Admin Booking Page
-- Stats cards (total, pending, completed, revenue)
-- Table dengan filter & search
-- Badge status berwarna (pending=yellow, completed=green)
-- Dialog konfirmasi dengan textarea notes
-- Show confirmer name setelah completed
-
-## 🛠️ Tech Stack
-
-### Backend (Supabase)
-- PostgreSQL dengan RLS
-- Row Level Security policies
-- Database functions (create_public_booking)
-- Real-time subscriptions ready
-
-### Frontend
-- React 18 + TypeScript
-- Vite
-- shadcn/ui components
-- TanStack Query
-- React Router
-
-## 📊 Statistik & Reporting
-
-### Dashboard Cards
-```typescript
-{
-  todayBookings: number,
-  monthBookingsRevenue: number,
-  pendingBookings: number,
-  completedBookings: number
-}
-```
-
-### Booking Stats View
-```sql
-SELECT 
-  outlet_id,
-  DATE(slot_time) as booking_date,
-  COUNT(*) as total_bookings,
-  COUNT(*) FILTER (WHERE status = 'completed') as completed_bookings,
-  SUM(payment_amount) FILTER (WHERE payment_status = 'paid') as total_revenue
-FROM bookings
-GROUP BY outlet_id, DATE(slot_time);
-```
-
 ## 🔐 Security
 
 - RLS enabled di tabel `bookings`
@@ -209,37 +130,6 @@ GROUP BY outlet_id, DATE(slot_time);
 - Admin auth required untuk konfirmasi
 - Tracking `confirmed_by` user
 
-## 📱 Mobile Responsive
-
-- Grid layout auto-adjust
-- Form stacked di mobile
-- Touch-friendly buttons
-- Readable font sizes
-
-## 🧪 Testing
-
-### Manual Test Checklist
-- [ ] Public booking form submit berhasil
-- [ ] Booking muncul di admin panel
-- [ ] Konfirmasi booking → transaksi tercatat
-- [ ] Revenue muncul di dashboard
-- [ ] Email notifikasi terkirim (jika ada email service)
-
-## 🚧 Future Enhancements
-
-- [ ] Email confirmation otomatis
-- [ ] WhatsApp notification
-- [ ] Online payment gateway (Midtrans)
-- [ ] Reminder H-1 booking
-- [ ] Rating & review system
-- [ ] Multi-service selection (tidak hanya pangkas)
-- [ ] Booking calendar view untuk admin
-- [ ] Export booking ke PDF/Excel
-
-## 📞 Support
-
-Untuk pertanyaan atau issue, hubungi tim development atau buat ticket di repository.
-
 ---
 
-**Built with ❤️ for Business Owners**
+**Built with ❤️ for Veroprise ERP**

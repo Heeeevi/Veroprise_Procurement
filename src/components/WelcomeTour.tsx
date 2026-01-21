@@ -50,7 +50,7 @@ export default function WelcomeTour() {
 
     useEffect(() => {
         // Check if user has seen the tour
-        const tourSeen = localStorage.getItem('barberdoc_tour_completed');
+        const tourSeen = localStorage.getItem('veroprise_tour_completed');
         if (!tourSeen) {
             // Show tour after a short delay
             const timer = setTimeout(() => setIsVisible(true), 1000);
@@ -69,7 +69,7 @@ export default function WelcomeTour() {
     };
 
     const handleComplete = () => {
-        localStorage.setItem('barberdoc_tour_completed', 'true');
+        localStorage.setItem('veroprise_tour_completed', 'true');
         setIsVisible(false);
         setHasSeenTour(true);
     };

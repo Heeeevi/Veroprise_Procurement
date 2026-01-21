@@ -64,7 +64,7 @@ export default function Reports() {
       const { data } = await supabase
         .from('outlets')
         .select('id, name, address')
-        .eq('is_active', true)
+        .eq('status', 'active')
         .order('name');
       setOutlets(data || []);
       // Default to selected outlet or 'all'
@@ -166,7 +166,8 @@ export default function Reports() {
       });
 
       const topProducts = Array.from(productMap.entries())
-        .map(([name, data]) => ({ name, ...data }))
+        .filter(([name]) => name !== undefined && name !== null && name !== 'undefined' && name !== 'null')
+        .map(([name, data]) => ({ name: name || 'Unnamed', ...data }))
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 5);
 
@@ -303,7 +304,8 @@ export default function Reports() {
       });
 
       const allServices = Array.from(allProductsMap.entries())
-        .map(([name, data]) => ({ name, ...data }))
+        .filter(([name]) => name !== undefined && name !== null && name !== 'undefined' && name !== 'null')
+        .map(([name, data]) => ({ name: name || 'Unnamed', ...data }))
         .sort((a, b) => b.revenue - a.revenue);
 
       // Fetch booking statistics

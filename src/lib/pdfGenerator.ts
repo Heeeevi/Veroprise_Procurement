@@ -308,7 +308,7 @@ export async function generateReportPDF(data: ReportData): Promise<void> {
             pdf.rect(margin, yPos, pageWidth - margin * 2, 9, 'F');
 
             addText(`${idx + 1}`, margin + 3, yPos + 6, { fontSize: 8, color: [100, 116, 139] });
-            addText(service.name.substring(0, 40), margin + 15, yPos + 6, { fontSize: 8 });
+            addText((service.name || 'Unnamed').substring(0, 40), margin + 15, yPos + 6, { fontSize: 8 });
             addText(`${service.quantity}x`, margin + 110, yPos + 6, { fontSize: 8, color: [100, 116, 139] });
             addText(formatCurrency(service.revenue), pageWidth - margin - 3, yPos + 6, { fontSize: 8, fontStyle: 'bold', color: [34, 197, 94], align: 'right' });
 
