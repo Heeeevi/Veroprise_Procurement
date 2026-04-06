@@ -114,7 +114,7 @@ export default function Vendors() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <Link to="/inventory">
+                            <Link to="/warehouse/inventory">
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
                                     <ArrowLeft className="h-4 w-4" />
                                 </Button>

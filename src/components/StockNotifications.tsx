@@ -146,9 +146,9 @@ export default function StockNotifications() {
 
                 {lowStockItems.length > 0 && (
                     <div className="p-3 border-t bg-muted/50">
-                        <Link to="/inventory" onClick={() => setIsOpen(false)}>
+                        <Link to="/warehouse/inventory" onClick={() => setIsOpen(false)}>
                             <Button variant="outline" size="sm" className="w-full">
-                                Lihat Inventory
+                                Lihat Gudang
                             </Button>
                         </Link>
                     </div>

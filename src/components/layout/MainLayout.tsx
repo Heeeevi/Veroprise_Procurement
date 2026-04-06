@@ -3,7 +3,7 @@ import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import {
-  LayoutDashboard, ShoppingCart, Package, Receipt,
+  LayoutDashboard, ShoppingCart, Receipt,
   Users, BarChart3, LogOut, Menu, ChevronDown, Store, Tag, Settings, Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,8 +27,7 @@ const menuItems = [
   // BOOKING DISABLED
   // { icon: Calendar, label: 'Booking', href: '/bookings', roles: ['owner', 'manager', 'staff'] },
   { icon: Tag, label: 'Produk & Layanan', href: '/products', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'manager'] },
-  { icon: Package, label: 'Inventory', href: '/inventory', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
-  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'manager'] },
+  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
   { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
   { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['super_admin', 'owner', 'manager'] },
   { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
@@ -73,7 +72,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const NavLinks = () => (
     <nav className="space-y-1">
       {visibleMenus.map((item) => {
-        const isActive = location.pathname === item.href;
+        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

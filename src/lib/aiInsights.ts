@@ -154,7 +154,7 @@ export async function generateBusinessInsights(outletId: string): Promise<Busine
                     title: `${criticalItems.length} Item Stok Menipis`,
                     description: `${itemNames}${criticalItems.length > 3 ? ` dan ${criticalItems.length - 3} lainnya` : ''} perlu di-restock.`,
                     actionLabel: 'Buat PO',
-                    actionHref: '/inventory/purchase-orders'
+                    actionHref: '/warehouse/purchase-orders'
                 });
             }
 
@@ -174,7 +174,7 @@ export async function generateBusinessInsights(outletId: string): Promise<Busine
                     title: 'Prediksi Stok Habis',
                     description: `${almostOut[0].name} diprediksi habis dalam 5 hari berdasarkan pola konsumsi.`,
                     actionLabel: 'Lihat Inventory',
-                    actionHref: '/inventory'
+                    actionHref: '/warehouse/inventory'
                 });
             }
         }

@@ -449,13 +449,13 @@ export default function Inventory() {
           </div>
           {(isOwner || isManager) && (
             <div className="flex gap-2">
-              <Link to="/inventory/vendors">
+              <Link to="/warehouse/vendors">
                 <Button variant="outline">
                   <Truck className="h-4 w-4 mr-2" />
                   Manage Vendors
                 </Button>
               </Link>
-              <Link to="/inventory/purchase-orders">
+              <Link to="/warehouse/purchase-orders">
                 <Button variant="outline">
                   <FileText className="h-4 w-4 mr-2" />
                   Purchase Orders

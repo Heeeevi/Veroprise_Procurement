@@ -273,7 +273,7 @@ export default function PurchaseOrders() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <Link to="/inventory">
+                            <Link to="/warehouse/inventory">
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
                                     <ArrowLeft className="h-4 w-4" />
                                 </Button>
@@ -346,7 +346,7 @@ export default function PurchaseOrders() {
                                             <TableCell>{order.ordered_date ? new Date(order.ordered_date).toLocaleDateString('id-ID') : '-'}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(order.total_amount)}</TableCell>
                                             <TableCell className="text-right">
-                                                <Link to={`/inventory/purchase-orders/${order.id}`}>
+                                                <Link to={`/warehouse/purchase-orders/${order.id}`}>
                                                     <Button variant="ghost" size="sm">
                                                         <Eye className="h-4 w-4 mr-1" />
                                                         Detail

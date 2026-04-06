@@ -12,8 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, RefreshCw, ClipboardList, FileText, Printer, ClipboardCheck } from 'lucide-react';
+import { Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, RefreshCw, ClipboardList, FileText, Printer, ClipboardCheck, MoreVertical, ShoppingCart, Users, Layers, ChevronDown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Link } from 'react-router-dom';
 
 interface WarehouseItem {
     id: string;
@@ -78,6 +80,7 @@ export default function WarehousePage() {
     const [showTransferDialog, setShowTransferDialog] = useState(false);
     const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
     const [showDailyAuditDialog, setShowDailyAuditDialog] = useState(false);
+    const [showMaterialRequestGuide, setShowMaterialRequestGuide] = useState(false);
 
     // Receive from supplier form
     const [receiveProduct, setReceiveProduct] = useState('');
@@ -877,20 +880,75 @@ export default function WarehousePage() {
                                 <ArrowRight className="h-4 w-4 mr-2" />
                                 Material Request
                             </Button>
-                            <Button variant="outline" onClick={() => setShowDeliveryDialog(true)}>
-                                <FileText className="h-4 w-4 mr-2" />
-                                Surat Jalan / Tanda Terima
-                            </Button>
-                            <Button variant="outline" onClick={handleOpenDailyAudit}>
-                                <ClipboardCheck className="h-4 w-4 mr-2" />
-                                Audit Harian
-                            </Button>
-                            <Button variant="secondary" onClick={handleOpenOpname}>
-                                <ClipboardList className="h-4 w-4 mr-2" />
-                                Stock Opname
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline">
+                                        <MoreVertical className="h-4 w-4 mr-2" />
+                                        Lainnya
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setShowDeliveryDialog(true)}>
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Surat Jalan / Tanda Terima
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleOpenDailyAudit}>
+                                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                                        Audit Harian
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleOpenOpname}>
+                                        <ClipboardList className="h-4 w-4 mr-2" />
+                                        Stock Opname
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     )}
+                </div>
+
+                {/* Quick Navigation to Important Sections */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Link to="/warehouse/inventory" className="no-underline">
+                        <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border border-transparent hover:border-primary/30 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+                            <CardContent className="p-6 flex items-center gap-4">
+                                <div className="p-3 bg-blue-200 dark:bg-blue-800 rounded-lg">
+                                    <Package className="h-6 w-6 text-blue-700 dark:text-blue-200" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-sm">Inventory</h3>
+                                    <p className="text-xs text-muted-foreground">Kelola produk gudang</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                    
+                    <Link to="/warehouse/purchase-orders" className="no-underline">
+                        <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border border-transparent hover:border-primary/30 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
+                            <CardContent className="p-6 flex items-center gap-4">
+                                <div className="p-3 bg-green-200 dark:bg-green-800 rounded-lg">
+                                    <ShoppingCart className="h-6 w-6 text-green-700 dark:text-green-200" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-sm">Purchase Orders</h3>
+                                    <p className="text-xs text-muted-foreground">Pesan barang dari supplier</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                    
+                    <Link to="/warehouse/vendors" className="no-underline">
+                        <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border border-transparent hover:border-primary/30 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900">
+                            <CardContent className="p-6 flex items-center gap-4">
+                                <div className="p-3 bg-orange-200 dark:bg-orange-800 rounded-lg">
+                                    <Users className="h-6 w-6 text-orange-700 dark:text-orange-200" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-sm">Manage Vendors</h3>
+                                    <p className="text-xs text-muted-foreground">Kelola data supplier</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
                 </div>
 
                 {/* Warehouse Selector */}
@@ -1066,59 +1124,102 @@ export default function WarehousePage() {
 
                 <Card className="card-warm">
                     <CardHeader>
-                        <CardTitle className="font-display flex items-center gap-2">
-                            <ArrowRight className="h-5 w-5" />
-                            Material Request Unit Produksi
-                        </CardTitle>
+                        <div className="flex items-center justify-between gap-3">
+                            <CardTitle className="font-display flex items-center gap-2 text-base">
+                                <Layers className="h-5 w-5" />
+                                Alur Material Request
+                            </CardTitle>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowMaterialRequestGuide((value) => !value)}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <ChevronDown className={`h-4 w-4 mr-1 transition-transform ${showMaterialRequestGuide ? 'rotate-180' : ''}`} />
+                                {showMaterialRequestGuide ? 'Sembunyikan' : 'Lihat alur'}
+                            </Button>
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>No Request</TableHead>
-                                        <TableHead>Tanggal</TableHead>
-                                        <TableHead>Outlet Tujuan</TableHead>
-                                        <TableHead>Produk</TableHead>
-                                        <TableHead>Qty</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Aksi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {materialRequests.length === 0 ? (
+                    {showMaterialRequestGuide && (
+                        <CardContent className="pt-0 pb-4">
+                            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                                <div className="mb-2 font-medium text-foreground">Cara Kerja Material Request:</div>
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <span className="font-mono text-xs text-muted-foreground">1.</span>
+                                        <p>Unit POS/Peracikan membuat request material via form "Material Request" di menu Gudang</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="font-mono text-xs text-muted-foreground">2.</span>
+                                        <p>Tim Gudang melihat request masuk di tabel bawah dan memproses pengiriman barang</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="font-mono text-xs text-muted-foreground">3.</span>
+                                        <p>Gudang membuat Surat Jalan atau Tanda Terima untuk dokumentasi pengiriman</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="font-mono text-xs text-muted-foreground">4.</span>
+                                        <p>Status request berubah ke "received" setelah disetujui dan barang masuk ke unit tujuan</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    )}
+
+                    <CardContent className="space-y-4 pt-0">
+                        <div>
+                            <h3 className="font-semibold mb-4 flex items-center gap-2">
+                                <ArrowRight className="h-4 w-4" />
+                                Daftar Material Request Masuk
+                            </h3>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                                                Belum ada material request
-                                            </TableCell>
+                                            <TableHead>No Request</TableHead>
+                                            <TableHead>Tanggal</TableHead>
+                                            <TableHead>Outlet Tujuan</TableHead>
+                                            <TableHead>Produk</TableHead>
+                                            <TableHead>Qty</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Aksi</TableHead>
                                         </TableRow>
-                                    ) : (
-                                        materialRequests.map((request) => (
-                                            <TableRow key={request.id}>
-                                                <TableCell className="font-medium">{request.transfer_number}</TableCell>
-                                                <TableCell>{request.requested_date ? new Date(request.requested_date).toLocaleDateString('id-ID') : '-'}</TableCell>
-                                                <TableCell>{request.to_outlet_name}</TableCell>
-                                                <TableCell>{request.product_name}</TableCell>
-                                                <TableCell>{request.quantity_requested}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={request.status === 'received' ? 'secondary' : 'outline'}>
-                                                        {request.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {request.status !== 'received' && request.status !== 'cancelled' ? (
-                                                        <Button size="sm" onClick={() => handleProcessMaterialRequest(request)}>
-                                                            Proses
-                                                        </Button>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">Selesai</span>
-                                                    )}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {materialRequests.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                                                    Belum ada material request
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                        ) : (
+                                            materialRequests.map((request) => (
+                                                <TableRow key={request.id}>
+                                                    <TableCell className="font-medium">{request.transfer_number}</TableCell>
+                                                    <TableCell>{request.requested_date ? new Date(request.requested_date).toLocaleDateString('id-ID') : '-'}</TableCell>
+                                                    <TableCell>{request.to_outlet_name}</TableCell>
+                                                    <TableCell>{request.product_name}</TableCell>
+                                                    <TableCell>{request.quantity_requested}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={request.status === 'received' ? 'secondary' : 'outline'}>
+                                                            {request.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {request.status !== 'received' && request.status !== 'cancelled' ? (
+                                                            <Button size="sm" onClick={() => handleProcessMaterialRequest(request)}>
+                                                                Proses
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">Selesai</span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

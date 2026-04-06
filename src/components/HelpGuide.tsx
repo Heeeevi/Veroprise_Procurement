@@ -34,7 +34,18 @@ const helpContentMap: Record<string, HelpContent> = {
         ],
         tips: ['Pastikan sudah "Mulai Shift" sebelum melakukan transaksi', 'Struk bisa dicetak setelah transaksi selesai']
     },
-    '/inventory': {
+    '/warehouse': {
+        title: '🏭 Gudang',
+        description: 'Pusat operasional stok, material request, dan distribusi antar unit.',
+        steps: [
+            { title: 'Pilih Gudang', desc: 'Pilih warehouse aktif untuk melihat data yang sesuai' },
+            { title: 'Kelola Arus Barang', desc: 'Gunakan tab untuk penerimaan supplier, request material, dan stock opname' },
+            { title: 'Pantau Alert', desc: 'Cek notifikasi stok rendah agar restock tidak terlambat' },
+            { title: 'Lanjut ke Procurement', desc: 'Akses Vendor dan Purchase Orders dari modul Gudang' }
+        ],
+        tips: ['Gunakan Material Request untuk suplai ke unit produksi/peracikan', 'Pastikan proses stock opname rutin untuk akurasi data']
+    },
+    '/warehouse/inventory': {
         title: '📦 Inventory',
         description: 'Kelola stok bahan baku dan barang dagangan Anda.',
         steps: [
@@ -45,7 +56,7 @@ const helpContentMap: Record<string, HelpContent> = {
         ],
         tips: ['Atur "Min Stock" agar dapat notifikasi saat stok menipis', 'Gunakan fitur "Batches" untuk tracking expiry date']
     },
-    '/inventory/purchase-orders': {
+    '/warehouse/purchase-orders': {
         title: '🧾 Purchase Orders',
         description: 'Catat pembelian barang dari supplier/vendor.',
         steps: [
@@ -56,7 +67,7 @@ const helpContentMap: Record<string, HelpContent> = {
         ],
         tips: ['PO yang sudah "Received" otomatis tercatat sebagai Pengeluaran di Laporan', 'Gunakan "Sync Expenses" jika ada PO lama yang belum tercatat']
     },
-    '/inventory/vendors': {
+    '/warehouse/vendors': {
         title: '🏪 Vendor / Supplier',
         description: 'Database supplier dan rekomendasi partner dari Veroprise.',
         steps: [
@@ -116,7 +127,9 @@ export default function HelpGuide() {
     const location = useLocation();
 
     // Get help content for current page
-    const pathKey = Object.keys(helpContentMap).find(key => location.pathname.startsWith(key)) || '/dashboard';
+    const pathKey = Object.keys(helpContentMap)
+        .sort((a, b) => b.length - a.length)
+        .find(key => location.pathname.startsWith(key)) || '/dashboard';
     const content = helpContentMap[pathKey] || helpContentMap['/dashboard'];
 
     return (

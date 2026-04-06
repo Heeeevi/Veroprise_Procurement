@@ -122,7 +122,7 @@ export default function Index() {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
     { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['super_admin', 'owner', 'manager', 'staff'] },
-    { icon: Package, label: 'Inventory', href: '/inventory', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
+    { icon: Package, label: 'Gudang', href: '/warehouse', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
     { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
     { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
     { icon: Users, label: 'Pengguna', href: '/users', roles: ['super_admin', 'owner'] },

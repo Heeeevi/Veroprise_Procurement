@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { OutletProvider } from "@/hooks/useOutlet";
 import { ShiftProvider } from "@/hooks/useShift";
@@ -49,11 +49,15 @@ const App = () => (
                 {/* <Route path="/bookings" element={<Bookings />} /> */}
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/products" element={<Products />} />
-                <Route path="/inventory" element={<Inventory />} />
-                <Route path="/inventory/vendors" element={<Vendors />} />
-                <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
-                <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
                 <Route path="/warehouse" element={<Warehouse />} />
+                <Route path="/warehouse/inventory" element={<Inventory />} />
+                <Route path="/warehouse/vendors" element={<Vendors />} />
+                <Route path="/warehouse/purchase-orders" element={<PurchaseOrders />} />
+                <Route path="/warehouse/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+                <Route path="/inventory" element={<Navigate to="/warehouse/inventory" replace />} />
+                <Route path="/inventory/vendors" element={<Navigate to="/warehouse/vendors" replace />} />
+                <Route path="/inventory/purchase-orders" element={<Navigate to="/warehouse/purchase-orders" replace />} />
+                <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
                 <Route path="/hr" element={<HRPage />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<Users />} />

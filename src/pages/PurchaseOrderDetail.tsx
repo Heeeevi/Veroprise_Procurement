@@ -20,6 +20,7 @@ interface POItem {
     id: string;
     product_id: string;
     quantity: number;
+    received_quantity?: number;
     unit_price: number;
     subtotal: number;
     product: {
@@ -162,12 +163,26 @@ export default function PurchaseOrderDetail() {
 
     const handleReceiveItems = async () => {
         try {
-            if (!selectedOutlet?.id) {
-                toast({ title: 'Error', description: 'Pilih outlet aktif sebelum menerima barang', variant: 'destructive' });
+            if (!po) {
+                toast({ title: 'Error', description: 'Purchase Order tidak ditemukan', variant: 'destructive' });
                 return;
             }
 
             const currentUserId = (await supabase.auth.getUser()).data.user?.id;
+            const warehouseId = po.warehouse_id;
+
+            // Write received quantities first so the DB trigger can increase warehouse stock correctly.
+            for (const item of items) {
+                const qty = Number(item.quantity) || 0;
+                if (qty <= 0) continue;
+
+                const { error: receivedQuantityError } = await supabase
+                    .from('purchase_order_items')
+                    .update({ received_quantity: qty })
+                    .eq('id', item.id);
+
+                if (receivedQuantityError) throw receivedQuantityError;
+            }
 
             // 1. Update PO Status
             await supabase.from('purchase_orders').update({
@@ -177,59 +192,26 @@ export default function PurchaseOrderDetail() {
                 updated_at: new Date().toISOString()
             }).eq('id', id);
 
-            // 2. Increase outlet inventory stock for all received items
+            // 2. Record stock-in movements for warehouse audit trail.
             for (const item of items) {
                 const qty = Number(item.quantity) || 0;
                 if (qty <= 0) continue;
 
-                const { data: existingInventory, error: inventoryFetchError } = await (supabase as any)
-                    .from('inventory')
-                    .select('id, quantity')
-                    .eq('outlet_id', selectedOutlet.id)
-                    .eq('product_id', item.product_id)
-                    .maybeSingle();
-
-                if (inventoryFetchError) throw inventoryFetchError;
-
-                if (existingInventory) {
-                    const { error: updateInventoryError } = await (supabase as any)
-                        .from('inventory')
-                        .update({ quantity: Number(existingInventory.quantity || 0) + qty })
-                        .eq('id', existingInventory.id);
-
-                    if (updateInventoryError) throw updateInventoryError;
-                } else {
-                    const { error: insertInventoryError } = await (supabase as any)
-                        .from('inventory')
-                        .insert({
-                            outlet_id: selectedOutlet.id,
-                            product_id: item.product_id,
-                            quantity: qty,
-                            min_quantity: 0,
-                            unit: 'pcs',
-                            is_active: true,
-                        });
-
-                    if (insertInventoryError) throw insertInventoryError;
-                }
-
-                const { error: transactionError } = await (supabase as any)
-                    .from('inventory_transactions')
+                const { error: movementError } = await (supabase as any)
+                    .from('warehouse_stock_movements')
                     .insert({
-                        outlet_id: selectedOutlet.id,
+                        warehouse_id: warehouseId,
                         product_id: item.product_id,
-                        transaction_type: 'purchase',
+                        movement_type: 'stock_in',
                         quantity: qty,
-                        unit_cost: Number(item.unit_price) || 0,
-                        total_cost: Number(item.subtotal) || 0,
+                        reference_table: 'purchase_orders',
                         reference_id: id,
-                        reference_type: 'purchase_order',
-                        notes: `Penerimaan dari PO #${po?.po_number || id?.substring(0, 8)}`,
+                        note: `Penerimaan dari PO #${po.po_number || id?.substring(0, 8)}`,
                         performed_by: currentUserId,
-                        transaction_date: new Date(`${receiveDate}T00:00:00`).toISOString(),
+                        movement_date: new Date(`${receiveDate}T00:00:00`).toISOString(),
                     });
 
-                if (transactionError) throw transactionError;
+                if (movementError) throw movementError;
             }
 
             // 3. Create Expense Record automatically
@@ -237,7 +219,7 @@ export default function PurchaseOrderDetail() {
             const itemTotalAmount = items.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
             const expenseAmount = poTotalAmount > 0 ? poTotalAmount : itemTotalAmount;
 
-            if (po && expenseAmount > 0 && selectedOutlet?.id) {
+            if (expenseAmount > 0 && selectedOutlet?.id) {
                 await supabase.from('expenses').insert({
                     outlet_id: selectedOutlet?.id,
                     created_by: currentUserId,
@@ -249,10 +231,10 @@ export default function PurchaseOrderDetail() {
                 });
             }
 
-            // Inventory warehouse will still be updated by DB trigger; outlet inventory is updated above.
-            toast({ title: 'Barang Diterima!', description: 'Status PO dan stok inventory outlet berhasil diperbarui.' });
+            toast({ title: 'Barang Diterima!', description: 'Status PO dan stok gudang berhasil diperbarui.' });
             setShowReceiveDialog(false);
             fetchPODetails();
+            fetchPOItems();
 
         } catch (error: any) {
             toast({ title: 'Gagal Menerima Barang', description: error.message, variant: 'destructive' });
@@ -266,7 +248,7 @@ export default function PurchaseOrderDetail() {
             <div className="p-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link to="/inventory/purchase-orders">
+                        <Link to="/warehouse/purchase-orders">
                             <Button variant="ghost" size="icon"><ArrowLeft /></Button>
                         </Link>
                         <div>
