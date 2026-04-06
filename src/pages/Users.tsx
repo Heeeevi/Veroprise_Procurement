@@ -20,10 +20,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 type ManagedRole = ProcurementRole;
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseClientKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const authClient = createClient(supabaseUrl, supabasePublishableKey, {
+const authClient = createClient(supabaseUrl, supabaseClientKey, {
   auth: {
     storage: sessionStorage,
     persistSession: false,
