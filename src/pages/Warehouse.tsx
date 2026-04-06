@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, Store, RefreshCw, ClipboardList } from 'lucide-react';
+import { Search, Warehouse as WarehouseIcon, ArrowRight, Package, Truck, RefreshCw, ClipboardList, FileText, Printer, ClipboardCheck } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface WarehouseItem {
@@ -32,8 +32,38 @@ interface Warehouse {
     is_active: boolean;
 }
 
+interface DeliveryDocument {
+    id: string;
+    document_number: string;
+    doc_type: 'surat_jalan' | 'tanda_terima';
+    doc_date: string;
+    receiver_unit: string;
+    receiver_name: string | null;
+    status: string;
+    notes: string | null;
+}
+
+interface DailyAuditItem {
+    product_id: string;
+    product_name: string;
+    system_qty: number;
+    physical_qty: number;
+    note: string;
+}
+
+interface MaterialRequest {
+    id: string;
+    transfer_number: string;
+    status: 'draft' | 'submitted' | 'approved' | 'in_transit' | 'received' | 'cancelled';
+    requested_date: string;
+    to_outlet_name: string;
+    product_id: string;
+    product_name: string;
+    quantity_requested: number;
+}
+
 export default function WarehousePage() {
-    const { isOwner, isManager } = useAuth();
+    const { isOwner, isManager, user } = useAuth();
     const { selectedOutlet } = useOutlet();
     const { toast } = useToast();
 
@@ -46,6 +76,8 @@ export default function WarehousePage() {
     // Dialogs
     const [showReceiveDialog, setShowReceiveDialog] = useState(false);
     const [showTransferDialog, setShowTransferDialog] = useState(false);
+    const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+    const [showDailyAuditDialog, setShowDailyAuditDialog] = useState(false);
 
     // Receive from supplier form
     const [receiveProduct, setReceiveProduct] = useState('');
@@ -57,10 +89,24 @@ export default function WarehousePage() {
     const [transferQuantity, setTransferQuantity] = useState('');
     const [transferDestination, setTransferDestination] = useState('');
 
+    // Delivery document
+    const [deliveryType, setDeliveryType] = useState<'surat_jalan' | 'tanda_terima'>('surat_jalan');
+    const [deliveryProduct, setDeliveryProduct] = useState('');
+    const [deliveryQuantity, setDeliveryQuantity] = useState('');
+    const [deliveryReceiverUnit, setDeliveryReceiverUnit] = useState('unit_produksi');
+    const [deliveryReceiverName, setDeliveryReceiverName] = useState('');
+    const [deliveryNotes, setDeliveryNotes] = useState('');
+    const [deliveryDocuments, setDeliveryDocuments] = useState<DeliveryDocument[]>([]);
+    const [materialRequests, setMaterialRequests] = useState<MaterialRequest[]>([]);
+
     // Stock Opname
     const [showOpnameDialog, setShowOpnameDialog] = useState(false);
     const [opnameItems, setOpnameItems] = useState<any[]>([]);
     const [opnameNote, setOpnameNote] = useState('');
+
+    // Daily audit
+    const [dailyAuditItems, setDailyAuditItems] = useState<DailyAuditItem[]>([]);
+    const [dailyAuditNote, setDailyAuditNote] = useState('');
 
     // Products and outlets for dropdowns
     const [products, setProducts] = useState<any[]>([]);
@@ -74,8 +120,105 @@ export default function WarehousePage() {
     useEffect(() => {
         if (selectedWarehouse) {
             fetchWarehouseInventory(selectedWarehouse.id);
+            fetchDeliveryDocuments(selectedWarehouse.id);
+            fetchMaterialRequests(selectedWarehouse.id);
         }
     }, [selectedWarehouse]);
+
+    useEffect(() => {
+        if (!selectedWarehouse) {
+            return;
+        }
+
+        const channel = supabase
+            .channel(`warehouse-live-${selectedWarehouse.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'warehouse_inventory', filter: `warehouse_id=eq.${selectedWarehouse.id}` },
+                () => {
+                    fetchWarehouseInventory(selectedWarehouse.id);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'delivery_documents', filter: `warehouse_id=eq.${selectedWarehouse.id}` },
+                () => {
+                    fetchDeliveryDocuments(selectedWarehouse.id);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'stock_transfer_orders', filter: `from_warehouse_id=eq.${selectedWarehouse.id}` },
+                () => {
+                    fetchMaterialRequests(selectedWarehouse.id);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'stock_transfer_items' },
+                () => {
+                    fetchMaterialRequests(selectedWarehouse.id);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [selectedWarehouse?.id]);
+
+    const fetchMaterialRequests = async (warehouseId: string) => {
+        try {
+            const { data, error } = await (supabase as any)
+                .from('stock_transfer_orders')
+                .select('id, transfer_number, status, requested_date, notes, to_outlet:outlets(name), stock_transfer_items(product_id, quantity_requested, products(name))')
+                .eq('from_warehouse_id', warehouseId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) throw error;
+
+            const rows: MaterialRequest[] = (data || [])
+                .map((row: any) => {
+                    const item = row.stock_transfer_items?.[0];
+                    if (!item) return null;
+
+                    return {
+                        id: row.id,
+                        transfer_number: row.transfer_number,
+                        status: row.status,
+                        requested_date: row.requested_date,
+                        to_outlet_name: row.to_outlet?.name || '-',
+                        product_id: item.product_id,
+                        product_name: item.products?.name || '-',
+                        quantity_requested: Number(item.quantity_requested || 0),
+                    } as MaterialRequest;
+                })
+                .filter(Boolean) as MaterialRequest[];
+
+            setMaterialRequests(rows);
+        } catch (error) {
+            console.error('Error fetching material requests:', error);
+            setMaterialRequests([]);
+        }
+    };
+
+    const fetchDeliveryDocuments = async (warehouseId: string) => {
+        try {
+            const { data, error } = await (supabase as any)
+                .from('delivery_documents')
+                .select('id, document_number, doc_type, doc_date, receiver_unit, receiver_name, status, notes')
+                .eq('warehouse_id', warehouseId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) throw error;
+            setDeliveryDocuments(data || []);
+        } catch (error) {
+            console.error('Error fetching delivery documents:', error);
+            setDeliveryDocuments([]);
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -146,7 +289,7 @@ export default function WarehousePage() {
     };
 
     const handleReceiveFromSupplier = async () => {
-        if (!selectedWarehouse || !receiveProduct || !receiveQuantity) {
+        if (!selectedWarehouse || !selectedOutlet || !receiveProduct || !receiveQuantity) {
             toast({ title: 'Error', description: 'Lengkapi semua data', variant: 'destructive' });
             return;
         }
@@ -185,6 +328,32 @@ export default function WarehousePage() {
                     });
             }
 
+            // Keep outlet inventory in sync for active branch context.
+            const { data: outletInventory } = await (supabase as any)
+                .from('inventory')
+                .select('id, quantity')
+                .eq('outlet_id', selectedOutlet.id)
+                .eq('product_id', receiveProduct)
+                .maybeSingle();
+
+            if (outletInventory) {
+                await (supabase as any)
+                    .from('inventory')
+                    .update({ quantity: Number(outletInventory.quantity || 0) + qty })
+                    .eq('id', outletInventory.id);
+            } else {
+                await (supabase as any)
+                    .from('inventory')
+                    .insert({
+                        outlet_id: selectedOutlet.id,
+                        product_id: receiveProduct,
+                        quantity: qty,
+                        min_quantity: 0,
+                        unit: 'pcs',
+                        is_active: true,
+                    });
+            }
+
             toast({ title: 'Berhasil', description: 'Barang dari supplier telah diterima' });
             setShowReceiveDialog(false);
             setReceiveProduct('');
@@ -206,74 +375,138 @@ export default function WarehousePage() {
         try {
             const qty = parseFloat(transferQuantity);
 
-            // Get current warehouse stock
-            const { data: warehouseStock } = await (supabase as any)
-                .from('warehouse_inventory')
-                .select('id, quantity')
-                .eq('warehouse_id', selectedWarehouse.id)
-                .eq('product_id', transferProduct)
-                .single();
-
-            if (!warehouseStock || warehouseStock.quantity < qty) {
-                toast({ title: 'Error', description: 'Stok gudang tidak mencukupi', variant: 'destructive' });
-                return;
-            }
-
-            // Decrease warehouse stock
-            await (supabase as any)
-                .from('warehouse_inventory')
-                .update({ quantity: warehouseStock.quantity - qty })
-                .eq('id', warehouseStock.id);
-
-            // Increase store product stock
-            const { data: storeProduct } = await supabase
-                .from('products')
-                .select('id, stock_quantity')
-                .eq('id', transferProduct)
-                .eq('outlet_id', transferDestination)
-                .single();
-
-            if (storeProduct) {
-                await supabase
-                    .from('products')
-                    .update({ stock_quantity: (storeProduct.stock_quantity || 0) + qty })
-                    .eq('id', storeProduct.id);
-            } else {
-                // Product doesn't exist in store, need to create or find
-                const { data: productInfo } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('id', transferProduct)
-                    .single();
-
-                if (productInfo) {
-                    // Create product in new outlet or just update stock
-                    await (supabase as any)
-                        .from('products')
-                        .update({ stock_quantity: (productInfo.stock_quantity || 0) + qty })
-                        .eq('id', transferProduct);
-                }
-            }
-
             // Log the transfer
-            await (supabase as any)
-                .from('stock_transfers')
+            const transferNumber = `TRF-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`;
+            const { data: transferOrder, error: transferOrderError } = await (supabase as any)
+                .from('stock_transfer_orders')
                 .insert({
-                    source_warehouse_id: selectedWarehouse.id,
-                    destination_outlet_id: transferDestination,
-                    status: 'received',
-                    transfer_date: new Date().toISOString().split('T')[0],
-                    notes: `Transfer ${qty} units`,
+                    transfer_number: transferNumber,
+                    from_warehouse_id: selectedWarehouse.id,
+                    to_outlet_id: transferDestination,
+                    status: 'submitted',
+                    requested_by: user?.id,
+                    requested_date: new Date().toISOString().split('T')[0],
+                    notes: `Material request ${qty} units`,
+                })
+                .select('id')
+                .single();
+
+            if (transferOrderError) throw transferOrderError;
+
+            const selectedItem = inventory.find((item) => item.product_id === transferProduct);
+            const { error: transferItemError } = await (supabase as any)
+                .from('stock_transfer_items')
+                .insert({
+                    stock_transfer_order_id: transferOrder.id,
+                    product_id: transferProduct,
+                    quantity_requested: qty,
+                    unit_cost: selectedItem?.cost_per_unit || 0,
+                    notes: `Requested via warehouse transfer form`,
                 });
 
-            toast({ title: 'Berhasil', description: 'Stok berhasil ditransfer ke toko' });
+            if (transferItemError) throw transferItemError;
+
+            toast({ title: 'Berhasil', description: 'Material request berhasil diajukan' });
             setShowTransferDialog(false);
             setTransferProduct('');
             setTransferQuantity('');
             setTransferDestination('');
-            fetchWarehouseInventory(selectedWarehouse.id);
+            fetchMaterialRequests(selectedWarehouse.id);
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    };
+
+    const handleProcessMaterialRequest = async (request: MaterialRequest) => {
+        if (!selectedWarehouse) return;
+        if (request.status === 'received' || request.status === 'cancelled') return;
+
+        try {
+            const qty = Number(request.quantity_requested || 0);
+            if (qty <= 0) {
+                toast({ title: 'Error', description: 'Qty request tidak valid', variant: 'destructive' });
+                return;
+            }
+
+            const { data: warehouseStock, error: stockError } = await (supabase as any)
+                .from('warehouse_inventory')
+                .select('id, quantity')
+                .eq('warehouse_id', selectedWarehouse.id)
+                .eq('product_id', request.product_id)
+                .single();
+
+            if (stockError || !warehouseStock || Number(warehouseStock.quantity || 0) < qty) {
+                toast({ title: 'Error', description: 'Stok gudang tidak mencukupi untuk request ini', variant: 'destructive' });
+                return;
+            }
+
+            await (supabase as any)
+                .from('warehouse_inventory')
+                .update({ quantity: Number(warehouseStock.quantity || 0) - qty })
+                .eq('id', warehouseStock.id);
+
+            const { data: transferOrder } = await (supabase as any)
+                .from('stock_transfer_orders')
+                .select('to_outlet_id')
+                .eq('id', request.id)
+                .single();
+
+            if (!transferOrder?.to_outlet_id) {
+                throw new Error('Tujuan outlet request tidak ditemukan');
+            }
+
+            const { data: outletInventory } = await (supabase as any)
+                .from('inventory')
+                .select('id, quantity')
+                .eq('outlet_id', transferOrder.to_outlet_id)
+                .eq('product_id', request.product_id)
+                .maybeSingle();
+
+            if (outletInventory) {
+                await (supabase as any)
+                    .from('inventory')
+                    .update({ quantity: Number(outletInventory.quantity || 0) + qty })
+                    .eq('id', outletInventory.id);
+            } else {
+                await (supabase as any)
+                    .from('inventory')
+                    .insert({
+                        outlet_id: transferOrder.to_outlet_id,
+                        product_id: request.product_id,
+                        quantity: qty,
+                        min_quantity: 0,
+                        unit: 'pcs',
+                        is_active: true,
+                    });
+            }
+
+            await (supabase as any)
+                .from('stock_transfer_items')
+                .update({
+                    quantity_sent: qty,
+                    quantity_received: qty,
+                })
+                .eq('stock_transfer_order_id', request.id)
+                .eq('product_id', request.product_id);
+
+            await (supabase as any)
+                .from('stock_transfer_orders')
+                .update({
+                    status: 'received',
+                    approved_by: user?.id,
+                    approved_date: new Date().toISOString(),
+                    sent_by: user?.id,
+                    sent_date: new Date().toISOString(),
+                    received_by: user?.id,
+                    received_date: new Date().toISOString(),
+                })
+                .eq('id', request.id);
+
+            toast({ title: 'Berhasil', description: `Request ${request.transfer_number} diproses dan stok dipindahkan` });
+            fetchWarehouseInventory(selectedWarehouse.id);
+            fetchMaterialRequests(selectedWarehouse.id);
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message || 'Gagal memproses material request', variant: 'destructive' });
         }
     };
 
@@ -302,20 +535,41 @@ export default function WarehousePage() {
         if (!selectedWarehouse) return;
 
         try {
+            const opnameNumber = `OPN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`;
+
             // 1. Create Opname Record
             const { data: opnameRef, error: opnameError } = await (supabase as any)
-                .from('stock_opnames')
+                .from('stock_opname')
                 .insert({
+                    opname_number: opnameNumber,
                     warehouse_id: selectedWarehouse.id,
                     opname_date: new Date().toISOString().split('T')[0],
                     status: 'completed',
-                    items: opnameItems,
+                    performed_by: user?.id,
                     notes: opnameNote
                 })
                 .select()
                 .single();
 
             if (opnameError) throw opnameError;
+
+            const opnameItemRows = opnameItems.map((item) => {
+                const matched = inventory.find((inv) => inv.product_id === item.product_id);
+                return {
+                    stock_opname_id: opnameRef.id,
+                    product_id: item.product_id,
+                    system_quantity: item.system_qty,
+                    physical_quantity: parseFloat(item.actual_qty),
+                    unit_cost: matched?.cost_per_unit || 0,
+                    notes: item.notes || null,
+                };
+            });
+
+            const { error: opnameItemsError } = await (supabase as any)
+                .from('stock_opname_items')
+                .insert(opnameItemRows);
+
+            if (opnameItemsError) throw opnameItemsError;
 
             // 2. Adjust Stock
             for (const item of opnameItems) {
@@ -337,6 +591,265 @@ export default function WarehousePage() {
         }
     };
 
+        const printDeliveryDocument = (payload: {
+                documentNumber: string;
+                docType: 'surat_jalan' | 'tanda_terima';
+                warehouseName: string;
+                receiverUnit: string;
+                receiverName: string;
+                productName: string;
+                quantity: number;
+            note: string;
+        }) => {
+                const docLabel = payload.docType === 'surat_jalan' ? 'Surat Jalan' : 'Tanda Terima';
+                const html = `
+                    <html>
+                    <head>
+                        <title>${docLabel} - ${payload.documentNumber}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+                            h1 { margin: 0 0 8px 0; }
+                            .muted { color: #6b7280; font-size: 12px; }
+                            .row { margin: 8px 0; }
+                            .box { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; margin-top: 12px; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>${docLabel}</h1>
+                        <div class="muted">No Dokumen: ${payload.documentNumber}</div>
+                        <div class="muted">Tanggal: ${new Date().toLocaleDateString('id-ID')}</div>
+
+                        <div class="box">
+                            <div class="row"><strong>Gudang:</strong> ${payload.warehouseName}</div>
+                            <div class="row"><strong>Unit Penerima:</strong> ${payload.receiverUnit}</div>
+                            <div class="row"><strong>Nama Penerima:</strong> ${payload.receiverName || '-'}</div>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Produk</th>
+                                    <th>Jumlah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>${payload.productName}</td>
+                                    <td>${payload.quantity}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="row"><strong>Catatan:</strong> ${payload.note || '-'}</div>
+                    </body>
+                    </html>
+                `;
+
+                const printWindow = window.open('', '_blank', 'width=900,height=700');
+                if (!printWindow) return;
+                printWindow.document.write(html);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+        };
+
+            const handleReprintDeliveryDocument = async (doc: DeliveryDocument) => {
+                try {
+                    const { data: docItem, error } = await (supabase as any)
+                        .from('delivery_document_items')
+                        .select('quantity, product_id, products(name)')
+                        .eq('delivery_document_id', doc.id)
+                        .limit(1)
+                        .single();
+
+                    if (error) throw error;
+
+                    printDeliveryDocument({
+                        documentNumber: doc.document_number,
+                        docType: doc.doc_type,
+                        warehouseName: selectedWarehouse?.name || '-',
+                        receiverUnit: doc.receiver_unit,
+                        receiverName: doc.receiver_name || '-',
+                        productName: docItem?.products?.name || 'Produk',
+                        quantity: Number(docItem?.quantity || 0),
+                        note: doc.notes || '',
+                    });
+                } catch (error: any) {
+                    toast({ title: 'Error', description: error.message || 'Gagal reprint dokumen', variant: 'destructive' });
+                }
+            };
+
+            const handleOpenDailyAudit = () => {
+                if (!selectedWarehouse) return;
+                const items: DailyAuditItem[] = inventory.map((item) => ({
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    system_qty: item.quantity,
+                    physical_qty: item.quantity,
+                    note: '',
+                }));
+                setDailyAuditItems(items);
+                setDailyAuditNote('');
+                setShowDailyAuditDialog(true);
+            };
+
+            const handleDailyAuditChange = (index: number, field: keyof DailyAuditItem, value: any) => {
+                const next = [...dailyAuditItems];
+                next[index] = { ...next[index], [field]: value };
+                setDailyAuditItems(next);
+            };
+
+            const handleSaveDailyAudit = async () => {
+                if (!selectedWarehouse || dailyAuditItems.length === 0) return;
+
+                try {
+                    const auditNumber = `AUD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`;
+                    const auditDate = new Date().toISOString().split('T')[0];
+
+                    const { data: existingAudit } = await (supabase as any)
+                        .from('daily_stock_audits')
+                        .select('id, audit_number')
+                        .eq('warehouse_id', selectedWarehouse.id)
+                        .eq('audit_date', auditDate)
+                        .maybeSingle();
+
+                    let audit: any = existingAudit;
+
+                    if (existingAudit) {
+                        const { data: updatedAudit, error: updateAuditError } = await (supabase as any)
+                            .from('daily_stock_audits')
+                            .update({
+                                status: 'completed',
+                                auditor_id: user?.id,
+                                notes: dailyAuditNote || null,
+                            })
+                            .eq('id', existingAudit.id)
+                            .select()
+                            .single();
+
+                        if (updateAuditError) throw updateAuditError;
+                        audit = updatedAudit;
+
+                        const { error: deleteItemsError } = await (supabase as any)
+                            .from('daily_stock_audit_items')
+                            .delete()
+                            .eq('daily_stock_audit_id', existingAudit.id);
+
+                        if (deleteItemsError) throw deleteItemsError;
+                    } else {
+                        const { data: newAudit, error: auditError } = await (supabase as any)
+                            .from('daily_stock_audits')
+                            .insert({
+                                audit_number: auditNumber,
+                                audit_date: auditDate,
+                                warehouse_id: selectedWarehouse.id,
+                                status: 'completed',
+                                auditor_id: user?.id,
+                                notes: dailyAuditNote || null,
+                            })
+                            .select()
+                            .single();
+
+                        if (auditError) throw auditError;
+                        audit = newAudit;
+                    }
+
+                    const rows = dailyAuditItems.map((item) => ({
+                        daily_stock_audit_id: audit.id,
+                        product_id: item.product_id,
+                        system_qty: Number(item.system_qty),
+                        physical_qty: Number(item.physical_qty),
+                        note: item.note || null,
+                    }));
+
+                    const { error: itemsError } = await (supabase as any)
+                        .from('daily_stock_audit_items')
+                        .insert(rows);
+
+                    if (itemsError) throw itemsError;
+
+                    toast({ title: 'Berhasil', description: `${audit.audit_number || auditNumber} tersimpan sebagai audit harian` });
+                    setShowDailyAuditDialog(false);
+                } catch (error: any) {
+                    toast({ title: 'Error', description: error.message || 'Gagal menyimpan audit harian', variant: 'destructive' });
+                }
+            };
+
+        const handleCreateDeliveryDocument = async () => {
+                if (!selectedWarehouse || !deliveryProduct || !deliveryQuantity) {
+                        toast({ title: 'Error', description: 'Lengkapi data dokumen pengiriman', variant: 'destructive' });
+                        return;
+                }
+
+                try {
+                        const qty = parseFloat(deliveryQuantity);
+                        const selectedItem = inventory.find((item) => item.product_id === deliveryProduct);
+
+                        if (!selectedItem || selectedItem.quantity < qty) {
+                                toast({ title: 'Error', description: 'Stok gudang tidak cukup untuk dokumen ini', variant: 'destructive' });
+                                return;
+                        }
+
+                        const prefix = deliveryType === 'surat_jalan' ? 'SJ' : 'TT';
+                        const documentNumber = `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`;
+
+                        const { data: docData, error: docError } = await (supabase as any)
+                                .from('delivery_documents')
+                                .insert({
+                                        document_number: documentNumber,
+                                        doc_type: deliveryType,
+                                        warehouse_id: selectedWarehouse.id,
+                                        receiver_unit: deliveryReceiverUnit,
+                                        receiver_name: deliveryReceiverName || null,
+                                        status: 'issued',
+                                        issued_by: user?.id,
+                                        issued_at: new Date().toISOString(),
+                                        notes: deliveryNotes || null,
+                                })
+                                .select()
+                                .single();
+
+                        if (docError) throw docError;
+
+                        const { error: itemError } = await (supabase as any)
+                                .from('delivery_document_items')
+                                .insert({
+                                        delivery_document_id: docData.id,
+                                        product_id: deliveryProduct,
+                                        quantity: qty,
+                                        unit: 'kg',
+                                        notes: deliveryNotes || null,
+                                });
+
+                        if (itemError) throw itemError;
+
+                        printDeliveryDocument({
+                                documentNumber,
+                                docType: deliveryType,
+                                warehouseName: selectedWarehouse.name,
+                                receiverUnit: deliveryReceiverUnit,
+                                receiverName: deliveryReceiverName,
+                                productName: selectedItem.product_name,
+                                quantity: qty,
+                                note: deliveryNotes,
+                        });
+
+                        toast({ title: 'Berhasil', description: `${documentNumber} berhasil dibuat dan siap dicetak` });
+                        setShowDeliveryDialog(false);
+                        setDeliveryType('surat_jalan');
+                        setDeliveryProduct('');
+                        setDeliveryQuantity('');
+                        setDeliveryReceiverUnit('unit_produksi');
+                        setDeliveryReceiverName('');
+                        setDeliveryNotes('');
+                        fetchDeliveryDocuments(selectedWarehouse.id);
+                } catch (error: any) {
+                        toast({ title: 'Error', description: error.message || 'Gagal membuat dokumen pengiriman', variant: 'destructive' });
+                }
+        };
+
     const filteredInventory = inventory.filter(item =>
         item.product_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -352,17 +865,25 @@ export default function WarehousePage() {
                             <WarehouseIcon className="h-6 w-6" />
                             Manajemen Gudang
                         </h1>
-                        <p className="text-muted-foreground">Kelola stok gudang pusat dan transfer ke toko</p>
+                        <p className="text-muted-foreground">Kelola stok gudang pusat, material request, dan distribusi ke unit</p>
                     </div>
                     {(isOwner || isManager) && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <Button variant="outline" onClick={() => setShowReceiveDialog(true)}>
                                 <Truck className="h-4 w-4 mr-2" />
                                 Terima dari Supplier
                             </Button>
                             <Button onClick={() => setShowTransferDialog(true)}>
                                 <ArrowRight className="h-4 w-4 mr-2" />
-                                Transfer ke Toko
+                                Material Request
+                            </Button>
+                            <Button variant="outline" onClick={() => setShowDeliveryDialog(true)}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Surat Jalan / Tanda Terima
+                            </Button>
+                            <Button variant="outline" onClick={handleOpenDailyAudit}>
+                                <ClipboardCheck className="h-4 w-4 mr-2" />
+                                Audit Harian
                             </Button>
                             <Button variant="secondary" onClick={handleOpenOpname}>
                                 <ClipboardList className="h-4 w-4 mr-2" />
@@ -438,6 +959,7 @@ export default function WarehousePage() {
                         </div>
                     </CardHeader>
                     <CardContent>
+                        <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -478,6 +1000,126 @@ export default function WarehousePage() {
                                 )}
                             </TableBody>
                         </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="card-warm">
+                    <CardHeader>
+                        <CardTitle className="font-display flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            Riwayat Delivery Document
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>No Dokumen</TableHead>
+                                    <TableHead>Tipe</TableHead>
+                                    <TableHead>Tanggal</TableHead>
+                                    <TableHead>Unit</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Aksi</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {deliveryDocuments.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                                            Belum ada dokumen delivery untuk gudang ini
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    deliveryDocuments.map((doc) => (
+                                        <TableRow key={doc.id}>
+                                            <TableCell className="font-medium">{doc.document_number}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {doc.doc_type === 'surat_jalan' ? 'Surat Jalan' : 'Tanda Terima'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{new Date(doc.doc_date).toLocaleDateString('id-ID')}</TableCell>
+                                            <TableCell>{doc.receiver_unit}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="secondary">{doc.status}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleReprintDeliveryDocument(doc)}
+                                                >
+                                                    <Printer className="h-4 w-4 mr-2" />
+                                                    Reprint
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="card-warm">
+                    <CardHeader>
+                        <CardTitle className="font-display flex items-center gap-2">
+                            <ArrowRight className="h-5 w-5" />
+                            Material Request Unit Produksi
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>No Request</TableHead>
+                                        <TableHead>Tanggal</TableHead>
+                                        <TableHead>Outlet Tujuan</TableHead>
+                                        <TableHead>Produk</TableHead>
+                                        <TableHead>Qty</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Aksi</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {materialRequests.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                                                Belum ada material request
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        materialRequests.map((request) => (
+                                            <TableRow key={request.id}>
+                                                <TableCell className="font-medium">{request.transfer_number}</TableCell>
+                                                <TableCell>{request.requested_date ? new Date(request.requested_date).toLocaleDateString('id-ID') : '-'}</TableCell>
+                                                <TableCell>{request.to_outlet_name}</TableCell>
+                                                <TableCell>{request.product_name}</TableCell>
+                                                <TableCell>{request.quantity_requested}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={request.status === 'received' ? 'secondary' : 'outline'}>
+                                                        {request.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {request.status !== 'received' && request.status !== 'cancelled' ? (
+                                                        <Button size="sm" onClick={() => handleProcessMaterialRequest(request)}>
+                                                            Proses
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">Selesai</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -550,9 +1192,9 @@ export default function WarehousePage() {
             <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="font-display">Transfer Stok ke Toko</DialogTitle>
+                        <DialogTitle className="font-display">Ajukan Material Request</DialogTitle>
                         <DialogDescription>
-                            Kirim stok dari gudang {selectedWarehouse?.name} ke outlet toko
+                            Buat request material dari gudang {selectedWarehouse?.name} ke outlet/unit produksi
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -572,7 +1214,7 @@ export default function WarehousePage() {
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Jumlah Transfer</Label>
+                            <Label>Jumlah Request</Label>
                             <Input
                                 type="number"
                                 placeholder="0"
@@ -598,7 +1240,164 @@ export default function WarehousePage() {
                         <Button variant="outline" onClick={() => setShowTransferDialog(false)}>Batal</Button>
                         <Button onClick={handleTransferToStore}>
                             <ArrowRight className="h-4 w-4 mr-2" />
-                            Transfer Stok
+                            Ajukan Request
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Daily Audit Dialog */}
+            <Dialog open={showDailyAuditDialog} onOpenChange={setShowDailyAuditDialog}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="font-display">Audit Mandiri Harian Gudang</DialogTitle>
+                        <DialogDescription>
+                            Catat stok fisik harian untuk kontrol dan jejak audit.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Produk</TableHead>
+                                        <TableHead className="w-24">Sistem</TableHead>
+                                        <TableHead className="w-24">Fisik</TableHead>
+                                        <TableHead className="w-24">Selisih</TableHead>
+                                        <TableHead>Catatan</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {dailyAuditItems.map((item, index) => {
+                                        const diff = Number(item.physical_qty || 0) - Number(item.system_qty || 0);
+                                        return (
+                                            <TableRow key={item.product_id}>
+                                                <TableCell className="font-medium">{item.product_name}</TableCell>
+                                                <TableCell>{item.system_qty}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        value={item.physical_qty}
+                                                        onChange={(e) => handleDailyAuditChange(index, 'physical_qty', Number(e.target.value))}
+                                                        className="h-8"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={diff === 0 ? 'text-muted-foreground' : diff > 0 ? 'text-green-600 font-semibold' : 'text-destructive font-semibold'}>
+                                                        {diff > 0 ? `+${diff}` : diff}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        value={item.note}
+                                                        onChange={(e) => handleDailyAuditChange(index, 'note', e.target.value)}
+                                                        placeholder="Catatan item"
+                                                        className="h-8"
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Catatan Audit</Label>
+                            <Input
+                                value={dailyAuditNote}
+                                onChange={(e) => setDailyAuditNote(e.target.value)}
+                                placeholder="Catatan umum audit harian"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowDailyAuditDialog(false)}>Batal</Button>
+                        <Button onClick={handleSaveDailyAudit}>
+                            <ClipboardCheck className="h-4 w-4 mr-2" />
+                            Simpan Audit Harian
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delivery Document Dialog */}
+            <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="font-display">Buat Dokumen Pengiriman</DialogTitle>
+                        <DialogDescription>
+                            Buat surat jalan atau tanda terima untuk perpindahan material internal
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Jenis Dokumen</Label>
+                            <Select value={deliveryType} onValueChange={(v) => setDeliveryType(v as 'surat_jalan' | 'tanda_terima')}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="surat_jalan">Surat Jalan</SelectItem>
+                                    <SelectItem value="tanda_terima">Tanda Terima</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Produk</Label>
+                            <Select value={deliveryProduct} onValueChange={setDeliveryProduct}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Pilih produk" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {inventory.map(item => (
+                                        <SelectItem key={item.product_id} value={item.product_id}>
+                                            {item.product_name} (Stok: {item.quantity})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Jumlah</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="0"
+                                    value={deliveryQuantity}
+                                    onChange={(e) => setDeliveryQuantity(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Unit Penerima</Label>
+                                <Input
+                                    placeholder="unit_produksi"
+                                    value={deliveryReceiverUnit}
+                                    onChange={(e) => setDeliveryReceiverUnit(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nama Penerima</Label>
+                            <Input
+                                placeholder="Nama personil penerima"
+                                value={deliveryReceiverName}
+                                onChange={(e) => setDeliveryReceiverName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Catatan</Label>
+                            <Input
+                                placeholder="Keterangan tambahan"
+                                value={deliveryNotes}
+                                onChange={(e) => setDeliveryNotes(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowDeliveryDialog(false)}>Batal</Button>
+                        <Button onClick={handleCreateDeliveryDocument}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Buat & Cetak
                         </Button>
                     </DialogFooter>
                 </DialogContent>

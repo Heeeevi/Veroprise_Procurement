@@ -79,37 +79,112 @@ export default function Inventory() {
   }, [selectedItemForBatches]);
 
   const fetchBatches = async (itemId: string) => {
-    const { data } = await supabase
-      .from('inventory_batches')
-      .select('*')
-      .eq('inventory_item_id', itemId)
-      .gt('current_quantity', 0) // Only show available batches
-      .order('expiration_date', { ascending: true });
-    setBatches(data || []);
+    // Batch module is not available in the current procurement schema.
+    setBatches([]);
   };
 
   useEffect(() => {
     fetchInventory();
-  }, []);
+  }, [selectedOutlet?.id]);
+
+  useEffect(() => {
+    if (!selectedOutlet) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`inventory-live-${selectedOutlet.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory', filter: `outlet_id=eq.${selectedOutlet.id}` },
+        () => {
+          fetchInventory();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'warehouse_inventory' },
+        () => {
+          fetchInventory();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchInventory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedOutlet?.id]);
 
   const fetchInventory = async () => {
     try {
-      // Fetch products with stock info (products table has stock_quantity, min_stock, cost)
-      const { data } = await (supabase as any)
-        .from('products')
-        .select('*')
-        .order('name');
+      if (!selectedOutlet) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
 
-      // Map products to inventory item interface
-      const inventoryItems = (data || []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        unit: 'pcs', // Default unit since products doesn't have unit field
-        min_stock: p.min_stock || 0,
-        current_stock: p.stock_quantity || 0,
-        cost_per_unit: p.cost || 0,
-        is_active: p.is_active,
-      }));
+      // Outlet-scoped inventory: each branch sees only its own stock.
+      const { data } = await (supabase as any)
+        .from('inventory')
+        .select('id, product_id, quantity, min_quantity, unit, is_active, product:products(name, cost, is_active, is_service)')
+        .eq('outlet_id', selectedOutlet.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      const inventoryItems = (data || [])
+        .filter((row: any) => row.product && row.product.is_active && !row.product.is_service)
+        .map((row: any) => ({
+          id: row.product_id,
+          name: row.product.name,
+          unit: row.unit || 'pcs',
+          min_stock: row.min_quantity || 0,
+          current_stock: row.quantity || 0,
+          cost_per_unit: row.product.cost || 0,
+          is_active: row.is_active,
+        }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      // Fallback for central-warehouse context: show warehouse stock if outlet inventory has not been seeded yet.
+      if (inventoryItems.length === 0 && selectedOutlet.name.toLowerCase().includes('warehouse')) {
+        const { data: centralWarehouse } = await (supabase as any)
+          .from('warehouses')
+          .select('id')
+          .eq('is_active', true)
+          .ilike('name', `%${selectedOutlet.name}%`)
+          .maybeSingle();
+
+        if (centralWarehouse?.id) {
+          const { data: warehouseRows } = await (supabase as any)
+            .from('warehouse_inventory')
+            .select('product_id, quantity, min_stock, cost_per_unit, product:products(name, is_active, is_service)')
+            .eq('warehouse_id', centralWarehouse.id);
+
+          const fallbackItems = (warehouseRows || [])
+            .filter((row: any) => row.product && row.product.is_active && !row.product.is_service)
+            .map((row: any) => ({
+              id: row.product_id,
+              name: row.product.name,
+              unit: 'pcs',
+              min_stock: row.min_stock || 0,
+              current_stock: row.quantity || 0,
+              cost_per_unit: row.cost_per_unit || 0,
+              is_active: true,
+            }))
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+          if (fallbackItems.length > 0) {
+            setItems(fallbackItems as InventoryItemWithStock[]);
+            return;
+          }
+        }
+      }
 
       setItems(inventoryItems as InventoryItemWithStock[]);
     } catch (error) {
@@ -171,9 +246,9 @@ export default function Inventory() {
     if (!selectedItem) return;
 
     try {
-      const hasAnyDependency =
-        deleteCheckResult?.hasTransactions ||
-        deleteCheckResult?.hasPurchaseOrders ||
+      const hasAnyDependency = 
+        deleteCheckResult?.hasTransactions || 
+        deleteCheckResult?.hasPurchaseOrders || 
         deleteCheckResult?.hasRecipes;
 
       if (hasAnyDependency) {
@@ -230,18 +305,29 @@ export default function Inventory() {
 
   const handleEditItem = async () => {
     if (!selectedItem) return;
-
+    if (!selectedOutlet) return;
+    
     try {
-      const { error } = await (supabase as any)
+      const { error: productError } = await (supabase as any)
         .from('products')
         .update({
           name: editItem.name,
-          min_stock: parseFloat(editItem.min_stock) || 0,
           cost: parseFloat(editItem.cost_per_unit) || 0,
         })
         .eq('id', selectedItem.id);
 
-      if (error) throw error;
+      if (productError) throw productError;
+
+      const { error: inventoryError } = await (supabase as any)
+        .from('inventory')
+        .update({
+          min_quantity: parseFloat(editItem.min_stock) || 0,
+          unit: editItem.unit || 'pcs',
+        })
+        .eq('outlet_id', selectedOutlet.id)
+        .eq('product_id', selectedItem.id);
+
+      if (inventoryError) throw inventoryError;
 
       toast({ title: 'Berhasil', description: 'Item berhasil diupdate' });
       setShowEditDialog(false);
@@ -258,18 +344,36 @@ export default function Inventory() {
       toast({ title: 'Error', description: 'Pilih outlet terlebih dahulu', variant: 'destructive' });
       return;
     }
-
+    
     try {
-      const { error } = await (supabase as any).from('products').insert({
-        outlet_id: selectedOutlet.id,
-        name: newItem.name,
-        price: 0, // Default price
-        min_stock: parseFloat(newItem.min_stock) || 0,
-        cost: parseFloat(newItem.cost_per_unit) || 0,
-        stock_quantity: 0,
-      });
+      const { data: newProduct, error: productError } = await (supabase as any)
+        .from('products')
+        .insert({
+          outlet_id: selectedOutlet.id,
+          name: newItem.name,
+          price: 0,
+          min_stock: parseFloat(newItem.min_stock) || 0,
+          cost: parseFloat(newItem.cost_per_unit) || 0,
+          stock_quantity: 0,
+          is_service: false,
+        })
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (productError) throw productError;
+
+      const { error: inventoryError } = await (supabase as any)
+        .from('inventory')
+        .insert({
+          outlet_id: selectedOutlet.id,
+          product_id: newProduct.id,
+          quantity: 0,
+          min_quantity: parseFloat(newItem.min_stock) || 0,
+          unit: newItem.unit || 'pcs',
+          is_active: true,
+        });
+
+      if (inventoryError) throw inventoryError;
 
       toast({ title: 'Berhasil', description: 'Item berhasil ditambahkan' });
       setShowAddDialog(false);
@@ -293,13 +397,31 @@ export default function Inventory() {
       const finalQty = adjustType === 'add' ? qty : -qty;
       const newStock = selectedItem.current_stock + finalQty;
 
-      // Update stock in products table
-      const { error: updateError } = await (supabase as any)
-        .from('products')
-        .update({ stock_quantity: newStock })
-        .eq('id', selectedItem.id);
+      if (newStock < 0) {
+        toast({ title: 'Error', description: 'Stok tidak boleh minus', variant: 'destructive' });
+        return;
+      }
+
+      // Update stock
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ quantity: newStock })
+        .eq('outlet_id', selectedOutlet.id)
+        .eq('product_id', selectedItem.id);
 
       if (updateError) throw updateError;
+
+      // Log transaction
+      const { error: logError } = await supabase.from('inventory_transactions').insert({
+        outlet_id: selectedOutlet.id,
+        product_id: selectedItem.id,
+        performed_by: user.id,
+        transaction_type: 'adjustment',
+        quantity: finalQty,
+        notes: adjustNotes,
+      });
+
+      if (logError) throw logError;
 
       toast({ title: 'Berhasil', description: 'Stok berhasil diupdate' });
       setShowAdjustDialog(false);
@@ -383,6 +505,7 @@ export default function Inventory() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -455,6 +578,7 @@ export default function Inventory() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -669,7 +793,7 @@ export default function Inventory() {
               Apakah Anda yakin ingin menghapus item berikut?
             </DialogDescription>
           </DialogHeader>
-
+          
           <div className="py-4 space-y-4">
             {/* Item Info */}
             <div className="p-4 bg-gray-50 rounded-lg">
@@ -728,8 +852,8 @@ export default function Inventory() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => {
                 setShowDeleteDialog(false);
                 setSelectedItem(null);
@@ -738,8 +862,8 @@ export default function Inventory() {
             >
               Batal
             </Button>
-            <Button
-              variant="destructive"
+            <Button 
+              variant="destructive" 
               onClick={handleDeleteConfirm}
               className="gap-2"
             >

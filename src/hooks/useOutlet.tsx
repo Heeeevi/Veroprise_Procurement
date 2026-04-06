@@ -41,8 +41,8 @@ export function OutletProvider({ children }: { children: ReactNode }) {
       const outletData = (allOutlets || []) as unknown as Outlet[];
       setOutlets(outletData);
 
-      // If owner or investor, they can see all outlets
-      if (role === 'owner' || role === 'investor') {
+      // Global roles can see all outlets.
+      if (role === 'owner' || role === 'super_admin' || role === 'investor') {
         setUserOutlets(outletData);
         if (outletData.length > 0 && !selectedOutlet) {
           setSelectedOutlet(outletData[0]);

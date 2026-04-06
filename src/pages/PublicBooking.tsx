@@ -440,7 +440,7 @@ export default function PublicBooking() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="bg-white p-2 rounded-lg border">
-              <img src="https://res.cloudinary.com/dtgqtofh6/image/upload/v1768297218/qris_barberdoc_ywx3v4.jpg" alt="QRIS" className="w-full h-auto rounded max-h-52 object-contain mx-auto" />
+              <img src="/qris-veroprise.jpeg" alt="QRIS" className="w-full h-auto rounded max-h-52 object-contain mx-auto" />
             </div>
             <div className="bg-accent/10 p-2 rounded-lg text-center">
               <p className="text-xs text-muted-foreground">Total</p>

@@ -18,15 +18,15 @@ import { Badge } from '@/components/ui/badge';
 
 interface PurchaseOrder {
     id: string;
-    supplier_id: string;
-    status: 'draft' | 'ordered' | 'received' | 'cancelled';
+    po_number: string;
+    supplier_id: string | null;
+    warehouse_id: string;
+    status: 'draft' | 'submitted' | 'approved' | 'received' | 'cancelled';
     total_amount: number;
     ordered_date: string;
     created_at: string;
     updated_at: string;
-    warehouse_id: string;
-    ordered_by: string;
-    supplier_name: string;
+    ordered_by: string | null;
     vendor: {
         name: string;
     };
@@ -44,15 +44,55 @@ export default function PurchaseOrders() {
     // Create PO Dialog State
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [newOrderVendor, setNewOrderVendor] = useState('');
+    const [newOrderWarehouse, setNewOrderWarehouse] = useState('');
     const [newOrderDate, setNewOrderDate] = useState('');
     const [vendors, setVendors] = useState<any[]>([]);
+    const [warehouses, setWarehouses] = useState<any[]>([]);
 
     useEffect(() => {
-        if (selectedOutlet) {
-            fetchOrders();
-            fetchVendors();
-        }
+        fetchOrders();
+        fetchVendors();
+        fetchWarehouses();
     }, [selectedOutlet]);
+
+    useEffect(() => {
+        const channel = supabase
+            .channel('purchase-orders-live')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'purchase_orders' },
+                () => {
+                    fetchOrders();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'purchase_order_items' },
+                () => {
+                    fetchOrders();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'suppliers' },
+                () => {
+                    fetchVendors();
+                    fetchOrders();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'warehouses' },
+                () => {
+                    fetchWarehouses();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     const fetchOrders = async () => {
         try {
@@ -67,13 +107,13 @@ export default function PurchaseOrders() {
             // Then get vendor names separately (from suppliers table)
             const vendorIds = [...new Set((ordersData || []).map((o: any) => o.supplier_id).filter(Boolean))];
             let vendorMap: Record<string, string> = {};
-
+            
             if (vendorIds.length > 0) {
                 const { data: vendorsData } = await (supabase as any)
                     .from('suppliers')
                     .select('id, name')
                     .in('id', vendorIds);
-
+                
                 vendorMap = (vendorsData || []).reduce((acc: Record<string, string>, v: any) => {
                     acc[v.id] = v.name;
                     return acc;
@@ -100,35 +140,28 @@ export default function PurchaseOrders() {
         setVendors(data || []);
     };
 
+    const fetchWarehouses = async () => {
+        const { data } = await (supabase as any)
+            .from('warehouses')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name');
+        const warehouseData = data || [];
+        setWarehouses(warehouseData);
+        if (!newOrderWarehouse && warehouseData.length > 0) {
+            setNewOrderWarehouse(warehouseData[0].id);
+        }
+    };
+
     const handleSyncExpenses = async () => {
         setSyncing(true);
         try {
             toast({ title: 'Processing', description: 'Syncing expenses from Purchase Orders...' });
 
-            // 1. Get or Create 'Inventory Purchase' Category
-            let categoryId: string | null = null;
-            const { data: existingCat } = await supabase
-                .from('expense_categories')
-                .select('id')
-                .eq('name', 'Inventory Purchase')
-                .maybeSingle();
-
-            if (existingCat) {
-                categoryId = existingCat.id;
-            } else {
-                const { data: newCat, error: catError } = await supabase
-                    .from('expense_categories')
-                    .insert({ name: 'Inventory Purchase', description: 'Auto-generated from PO' })
-                    .select()
-                    .single();
-                if (catError) throw catError;
-                categoryId = newCat?.id;
-            }
-
             // 2. Scan ALL Received POs
             const { data: receivedPOs, error: poError } = await supabase
                 .from('purchase_orders')
-                .select('*, vendor:vendors(name)')
+                .select('*')
                 .eq('status', 'received');
 
             if (poError) throw poError;
@@ -147,18 +180,21 @@ export default function PurchaseOrders() {
                         .maybeSingle();
 
                     if (!existingExpense) {
-                        const vendorName = po.vendor?.name || 'Unknown Vendor';
+                        const vendorName = po.supplier_name || 'Unknown Vendor';
                         const expenseDate = po.updated_at ? po.updated_at.split('T')[0] : new Date().toISOString().split('T')[0];
 
+                        if (!selectedOutlet?.id) {
+                            continue;
+                        }
+
                         const { error: insertError } = await supabase.from('expenses').insert({
-                            outlet_id: selectedOutlet?.id,
-                            user_id: po.ordered_by || user?.id,
-                            category_id: categoryId,
+                            outlet_id: selectedOutlet.id,
+                            created_by: po.ordered_by || user?.id,
+                            category: 'supplies',
                             amount: po.total_amount,
                             description: `Purchase Order #${poIdPrefix} - ${vendorName}`,
                             expense_date: expenseDate,
-                            status: 'approved',
-                            notes: 'Auto-generated from PO Sync'
+                            status: 'approved'
                         });
 
                         if (insertError) {
@@ -184,20 +220,22 @@ export default function PurchaseOrders() {
     };
 
     const handleCreateOrder = async () => {
-        if (!newOrderVendor || !selectedOutlet) {
-            toast({ title: 'Error', description: 'Pilih vendor terlebih dahulu', variant: 'destructive' });
+        if (!newOrderVendor || !newOrderWarehouse) {
+            toast({ title: 'Error', description: 'Pilih vendor dan gudang terlebih dahulu', variant: 'destructive' });
             return;
         }
 
         try {
+            const poNumber = `PO-${Date.now()}`;
             const { error } = await supabase
                 .from('purchase_orders')
                 .insert({
-                    warehouse_id: selectedOutlet?.id, // Using outlet as warehouse for now
+                    po_number: poNumber,
+                    warehouse_id: newOrderWarehouse,
                     supplier_id: newOrderVendor,
-                    ordered_date: newOrderDate || new Date().toISOString().split('T')[0],
                     status: 'draft',
                     ordered_by: user?.id,
+                    ordered_date: newOrderDate || new Date().toISOString().split('T')[0],
                     total_amount: 0
                 });
 
@@ -207,6 +245,7 @@ export default function PurchaseOrders() {
             setShowCreateDialog(false);
             setNewOrderVendor('');
             setNewOrderDate('');
+            setNewOrderWarehouse(warehouses[0]?.id || '');
             fetchOrders();
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -216,7 +255,8 @@ export default function PurchaseOrders() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'draft': return <Badge variant="secondary">Draft</Badge>;
-            case 'ordered': return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Ordered</Badge>;
+            case 'submitted': return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Submitted</Badge>;
+            case 'approved': return <Badge variant="default" className="bg-indigo-500 hover:bg-indigo-600">Approved</Badge>;
             case 'received': return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Received</Badge>;
             case 'cancelled': return <Badge variant="destructive">Cancelled</Badge>;
             default: return <Badge variant="outline">{status}</Badge>;
@@ -298,7 +338,7 @@ export default function PurchaseOrders() {
                                     filteredOrders.map((order) => (
                                         <TableRow key={order.id}>
                                             <TableCell className="font-mono text-xs text-muted-foreground">
-                                                {order.id.split('-')[0]}...
+                                                {order.po_number || `${order.id.split('-')[0]}...`}
                                             </TableCell>
                                             <TableCell className="font-medium">{order.vendor?.name || 'Unknown Vendor'}</TableCell>
                                             <TableCell>{getStatusBadge(order.status)}</TableCell>
@@ -343,7 +383,20 @@ export default function PurchaseOrders() {
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Estimasi Tanggal Tiba (Opsional)</Label>
+                            <Label>Pilih Gudang</Label>
+                            <Select value={newOrderWarehouse} onValueChange={setNewOrderWarehouse}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Pilih Gudang" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {warehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Tanggal Order (Opsional)</Label>
                             <Input
                                 type="date"
                                 value={newOrderDate}

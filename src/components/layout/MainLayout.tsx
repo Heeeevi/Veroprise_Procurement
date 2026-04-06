@@ -3,8 +3,8 @@ import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useOutlet } from '@/hooks/useOutlet';
 import {
-  Coffee, LayoutDashboard, ShoppingCart, Package, Receipt,
-  Users, BarChart3, LogOut, Menu, ChevronDown, Store, Calendar, Tag, Settings, Warehouse
+  LayoutDashboard, ShoppingCart, Package, Receipt,
+  Users, BarChart3, LogOut, Menu, ChevronDown, Store, Tag, Settings, Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,18 +22,18 @@ interface MainLayoutProps {
 }
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['owner', 'manager', 'staff', 'investor'] },
-  { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['owner', 'manager', 'staff'] },
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
+  { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['super_admin', 'owner', 'manager', 'staff'] },
   // BOOKING DISABLED
   // { icon: Calendar, label: 'Booking', href: '/bookings', roles: ['owner', 'manager', 'staff'] },
-  { icon: Tag, label: 'Produk & Layanan', href: '/products', roles: ['owner', 'manager'] },
-  { icon: Package, label: 'Inventory', href: '/inventory', roles: ['owner', 'manager', 'staff'] },
-  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['owner', 'manager'] },
-  { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
-  { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['owner', 'manager'] },
-  { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
-  { icon: Users, label: 'Pengguna', href: '/users', roles: ['owner'] },
-  { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['owner', 'manager', 'staff', 'investor'] },
+  { icon: Tag, label: 'Produk & Layanan', href: '/products', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'manager'] },
+  { icon: Package, label: 'Inventory', href: '/inventory', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
+  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'manager'] },
+  { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
+  { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['super_admin', 'owner', 'manager'] },
+  { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
+  { icon: Users, label: 'Pengguna', href: '/users', roles: ['super_admin', 'owner'] },
+  { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -57,6 +57,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const getRoleLabel = () => {
     switch (role) {
+      case 'super_admin': return 'Super Admin';
+      case 'pengadaan': return 'Pengadaan';
+      case 'gudang': return 'Gudang';
+      case 'peracikan_bumbu': return 'Peracikan Bumbu';
+      case 'unit_produksi': return 'Unit Produksi';
       case 'owner': return 'Owner';
       case 'manager': return 'Manager';
       case 'staff': return 'Staff';
@@ -95,11 +100,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="p-4 border-b border-sidebar-border flex-shrink-0">
           <Link to="/dashboard" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-transparent flex items-center justify-center">
-              <img src="/logo.jpg" alt="Veroprise Logo" className="w-full h-full object-contain" />
+              <img src="/veroprise-logo.jpg" alt="Veroprise Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="font-display text-lg font-semibold">Veroprise ERP</h1>
-              <p className="text-xs text-sidebar-foreground/70">Whistleblower Entreprise Management</p>
+              <p className="text-xs text-sidebar-foreground/70">Logistics & Procurement Management</p>
             </div>
           </Link>
         </div>
@@ -177,7 +182,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <div className="p-4 border-b border-sidebar-border">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-transparent flex items-center justify-center">
-                      <img src="/logo.jpg" alt="Veroprise Logo" className="w-full h-full object-contain" />
+                      <img src="/veroprise-logo.jpg" alt="Veroprise Logo" className="w-full h-full object-contain" />
                     </div>
                     <div>
                       <h1 className="font-display text-lg font-semibold text-sidebar-foreground">Veroprise ERP</h1>

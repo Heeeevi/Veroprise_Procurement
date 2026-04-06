@@ -1,13 +1,10 @@
 [build]
-  command = "npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "18"
-
-# Environment variables yang diperlukan (set di Netlify Dashboard > Site Settings > Environment Variables):
-# - VITE_SUPABASE_URL = URL project Supabase Anda
-# - VITE_SUPABASE_PUBLISHABLE_KEY = Anon/Public key dari Supabase
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--no-audit --no-fund"
 
 [[redirects]]
   from = "/*"
@@ -20,3 +17,14 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

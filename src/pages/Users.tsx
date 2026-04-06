@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,8 +14,23 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Search, Edit, Trash2, UserPlus, Shield, Key, Mail, AlertTriangle, Building2, MapPin, Store } from 'lucide-react';
-import type { AppRole } from '@/types/database';
+import type { AppRole, LegacyRole, ProcurementRole } from '@/types/database';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+type ManagedRole = ProcurementRole;
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const authClient = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: {
+    storage: sessionStorage,
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
 
 interface Outlet {
   id: string;
@@ -49,7 +65,7 @@ export default function Users() {
   const [showEditOutletDialog, setShowEditOutletDialog] = useState(false);
   const [showDeleteOutletDialog, setShowDeleteOutletDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole>('staff');
+  const [selectedRole, setSelectedRole] = useState<ManagedRole>('gudang');
   const [selectedOutletIds, setSelectedOutletIds] = useState<string[]>([]);
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | null>(null);
 
@@ -66,7 +82,7 @@ export default function Users() {
     password: '',
     full_name: '',
     phone: '',
-    role: 'staff' as AppRole,
+    role: 'gudang' as ManagedRole,
     outlet_id: '',
   });
 
@@ -118,6 +134,23 @@ export default function Users() {
         console.error('Error fetching user_outlets:', userOutletsError);
       }
 
+      const { data: procurementRoles, error: procurementRolesError } = await (supabase as any)
+        .from('procurement_user_roles')
+        .select('user_id, role, is_active, updated_at')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false });
+
+      if (procurementRolesError) {
+        console.error('Error fetching procurement roles:', procurementRolesError);
+      }
+
+      const procurementRoleMap = new Map<string, ManagedRole>();
+      (procurementRoles || []).forEach((row: any) => {
+        if (!procurementRoleMap.has(row.user_id)) {
+          procurementRoleMap.set(row.user_id, row.role as ManagedRole);
+        }
+      });
+
       // Create a map of user outlets by user_id
       const userOutletsMap = new Map<string, Outlet[]>();
       (userOutlets || []).forEach((uo: any) => {
@@ -132,15 +165,16 @@ export default function Users() {
         userOutletsMap.set(uo.user_id, existing);
       });
 
-      // Map profiles to UserWithRole (role is now in profiles)
+      // Map profiles to effective role (procurement first, fallback legacy role in profiles)
       const usersWithRoles: UserWithRole[] = (profiles || []).map((profile: any) => {
+        const role = (procurementRoleMap.get(profile.id) as AppRole | undefined) || (profile.role as LegacyRole | null);
         return {
           id: profile.id,
           user_id: profile.id, // id is the user_id (references auth.users)
           full_name: profile.full_name || `User ${profile.id.substring(0, 8)}...`,
           email: profile.email || profile.id.substring(0, 8),
           phone: profile.phone || null,
-          role: profile.role as AppRole, // role is now directly in profiles
+          role,
           created_at: profile.created_at,
           outlets: userOutletsMap.get(profile.id) || [],
         };
@@ -158,13 +192,36 @@ export default function Users() {
     if (!selectedUser) return;
 
     try {
-      // Update role in profiles table (role is now in profiles)
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: selectedRole } as any)
-        .eq('id', selectedUser.user_id);
+      await (supabase as any)
+        .from('procurement_user_roles')
+        .update({ is_active: false })
+        .eq('user_id', selectedUser.user_id);
 
-      if (error) throw error;
+      const { error: roleError } = await (supabase as any)
+        .from('procurement_user_roles')
+        .upsert(
+          {
+            user_id: selectedUser.user_id,
+            role: selectedRole,
+            is_active: true,
+          },
+          { onConflict: 'user_id,role' }
+        );
+
+      if (roleError) throw roleError;
+
+      // Keep legacy profile role compatible for screens that still read profiles.role.
+      const legacyRole: LegacyRole =
+        selectedRole === 'super_admin' || selectedRole === 'owner'
+          ? 'owner'
+          : selectedRole === 'pengadaan' || selectedRole === 'gudang'
+            ? 'manager'
+            : 'staff';
+
+      await supabase
+        .from('profiles')
+        .update({ role: legacyRole } as any)
+        .eq('id', selectedUser.user_id);
 
       toast({ title: 'Berhasil', description: 'Role berhasil diupdate' });
       setShowRoleDialog(false);
@@ -177,11 +234,10 @@ export default function Users() {
 
   const handleRemoveRole = async (userId: string) => {
     try {
-      // Set role to null in profiles (role is now in profiles)
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: null } as any)
-        .eq('id', userId);
+      const { error } = await (supabase as any)
+        .from('procurement_user_roles')
+        .update({ is_active: false })
+        .eq('user_id', userId);
 
       if (error) throw error;
 
@@ -205,7 +261,7 @@ export default function Users() {
           full_name: editForm.full_name,
           phone: editForm.phone || null,
         })
-        .eq('user_id', selectedUser.user_id);
+        .eq('id', selectedUser.user_id);
 
       if (profileError) throw profileError;
 
@@ -254,6 +310,12 @@ export default function Users() {
   };
 
   // Add new user (register without email verification)
+  const toLegacyOutletRole = (role: ManagedRole): 'owner' | 'manager' | 'staff' => {
+    if (role === 'owner' || role === 'super_admin') return 'owner';
+    if (role === 'pengadaan' || role === 'gudang') return 'manager';
+    return 'staff';
+  };
+
   const handleAddUser = async () => {
     if (!addForm.email || !addForm.password || !addForm.full_name) {
       toast({ title: 'Error', description: 'Email, password, dan nama harus diisi', variant: 'destructive' });
@@ -262,25 +324,31 @@ export default function Users() {
 
     try {
       // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await authClient.auth.signUp({
         email: addForm.email,
         password: addForm.password,
         options: {
-          data: { full_name: addForm.full_name },
+          data: {
+            full_name: addForm.full_name,
+            phone: addForm.phone,
+            role: addForm.role,
+          },
         },
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        // Wait a bit for trigger to create profile
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Update role in profile (role is now in profiles)
-        const { error: roleError } = await supabase
-          .from('profiles')
-          .update({ role: addForm.role } as any)
-          .eq('id', authData.user.id);
+        const { error: roleError } = await (supabase as any)
+          .from('procurement_user_roles')
+          .upsert(
+            {
+              user_id: authData.user.id,
+              role: addForm.role,
+              is_active: true,
+            },
+            { onConflict: 'user_id,role' }
+          );
 
         if (roleError) {
           console.error('Role assignment error:', roleError);
@@ -290,19 +358,18 @@ export default function Users() {
         if (addForm.outlet_id) {
           const { error: outletError } = await supabase
             .from('user_outlets')
-            .insert({ user_id: authData.user.id, outlet_id: addForm.outlet_id });
+            .upsert(
+              {
+                user_id: authData.user.id,
+                outlet_id: addForm.outlet_id,
+                role: toLegacyOutletRole(addForm.role),
+              } as any,
+              { onConflict: 'user_id,outlet_id' }
+            );
 
           if (outletError) {
             console.error('Outlet assignment error:', outletError);
           }
-        }
-
-        // Update profile with phone if provided
-        if (addForm.phone) {
-          await supabase
-            .from('profiles')
-            .update({ phone: addForm.phone })
-            .eq('user_id', authData.user.id);
         }
       }
 
@@ -311,7 +378,7 @@ export default function Users() {
         description: 'User baru berhasil dibuat. User bisa langsung login tanpa verifikasi email (jika Supabase confirm email disabled).'
       });
       setShowAddDialog(false);
-      setAddForm({ email: '', password: '', full_name: '', phone: '', role: 'staff', outlet_id: '' });
+      setAddForm({ email: '', password: '', full_name: '', phone: '', role: 'gudang', outlet_id: '' });
       fetchUsers();
     } catch (error: any) {
       console.error('Error adding user:', error);
@@ -448,17 +515,33 @@ export default function Users() {
 
   const getRoleBadge = (role: AppRole | null) => {
     switch (role) {
+      case 'super_admin':
+        return <Badge className="bg-destructive">Super Admin</Badge>;
+      case 'pengadaan':
+        return <Badge className="bg-info">Pengadaan</Badge>;
+      case 'gudang':
+        return <Badge className="bg-primary">Gudang</Badge>;
+      case 'peracikan_bumbu':
+        return <Badge className="bg-accent text-accent-foreground">Peracikan Bumbu</Badge>;
+      case 'unit_produksi':
+        return <Badge variant="secondary">Unit Produksi</Badge>;
       case 'owner':
         return <Badge className="bg-primary">Owner</Badge>;
       case 'manager':
-        return <Badge className="bg-info">Manager</Badge>;
+        return <Badge className="bg-info">Manager (Legacy)</Badge>;
       case 'staff':
-        return <Badge className="bg-accent text-accent-foreground">Staff</Badge>;
+        return <Badge variant="secondary">Staff (Legacy)</Badge>;
       case 'investor':
-        return <Badge variant="outline">Investor</Badge>;
+        return <Badge variant="outline">Investor (Legacy)</Badge>;
+      case 'customer':
+        return <Badge variant="secondary">Customer</Badge>;
       default:
-        return <Badge variant="secondary">No Role</Badge>;
+        return <Badge variant="secondary">Belum Ada Role</Badge>;
     }
+  };
+
+  const isManagedRole = (role: AppRole | null): role is ManagedRole => {
+    return role === 'super_admin' || role === 'owner' || role === 'pengadaan' || role === 'gudang' || role === 'peracikan_bumbu' || role === 'unit_produksi';
   };
 
   const filteredUsers = users.filter(
@@ -555,7 +638,7 @@ export default function Users() {
                               title="Assign Role"
                               onClick={() => {
                                 setSelectedUser(user);
-                                setSelectedRole(user.role || 'staff');
+                                setSelectedRole(isManagedRole(user.role) ? user.role : 'gudang');
                                 setShowRoleDialog(true);
                               }}
                             >
@@ -634,7 +717,7 @@ export default function Users() {
                   </div>
                   {isOwner && (
                     <Button onClick={() => {
-                      setOutletForm({ name: '', address: '' });
+                      setOutletForm({ name: '', address: '', phone: '' });
                       setShowAddOutletDialog(true);
                     }}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -741,15 +824,17 @@ export default function Users() {
             </p>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
+              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as ManagedRole)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="owner">Owner - Akses penuh</SelectItem>
-                  <SelectItem value="manager">Manager - Kelola outlet</SelectItem>
-                  <SelectItem value="staff">Staff - POS & input data</SelectItem>
-                  <SelectItem value="investor">Investor - Lihat laporan saja</SelectItem>
+                  <SelectItem value="super_admin">Super Admin - Akses sistem penuh</SelectItem>
+                  <SelectItem value="owner">Owner - Kontrol dan monitoring</SelectItem>
+                  <SelectItem value="pengadaan">Pengadaan - Kelola pembelian</SelectItem>
+                  <SelectItem value="gudang">Gudang - Terima dan distribusi stok</SelectItem>
+                  <SelectItem value="peracikan_bumbu">Peracikan Bumbu - Konversi bahan</SelectItem>
+                  <SelectItem value="unit_produksi">Unit Produksi - Request material</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -849,7 +934,7 @@ export default function Users() {
               Tambah Pengguna Baru
             </DialogTitle>
             <DialogDescription>
-              Buat akun baru untuk staff atau manager
+              Buat akun operasional baru untuk tim procurement dan logistik
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -889,15 +974,17 @@ export default function Users() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={addForm.role} onValueChange={(v) => setAddForm({ ...addForm, role: v as AppRole })}>
+              <Select value={addForm.role} onValueChange={(v) => setAddForm({ ...addForm, role: v as ManagedRole })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="staff">Staff - POS & input data</SelectItem>
-                  <SelectItem value="manager">Manager - Kelola outlet</SelectItem>
-                  <SelectItem value="owner">Owner - Akses penuh</SelectItem>
-                  <SelectItem value="investor">Investor - Lihat laporan</SelectItem>
+                  <SelectItem value="super_admin">Super Admin - Akses sistem penuh</SelectItem>
+                  <SelectItem value="owner">Owner - Kontrol dan monitoring</SelectItem>
+                  <SelectItem value="pengadaan">Pengadaan - Kelola pembelian</SelectItem>
+                  <SelectItem value="gudang">Gudang - Terima dan distribusi stok</SelectItem>
+                  <SelectItem value="peracikan_bumbu">Peracikan Bumbu - Konversi bahan</SelectItem>
+                  <SelectItem value="unit_produksi">Unit Produksi - Request material</SelectItem>
                 </SelectContent>
               </Select>
             </div>

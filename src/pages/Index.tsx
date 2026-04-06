@@ -28,7 +28,7 @@ export default function Index() {
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    if (selectedOutlet && (role === 'owner' || role === 'manager')) {
+    if (selectedOutlet && (role === 'owner' || role === 'super_admin' || role === 'manager' || role === 'pengadaan')) {
       fetchQuickStats();
     } else {
       setStatsLoading(false);
@@ -106,6 +106,11 @@ export default function Index() {
 
   const getRoleLabel = () => {
     switch (role) {
+      case 'super_admin': return 'Super Admin';
+      case 'pengadaan': return 'Pengadaan';
+      case 'gudang': return 'Gudang';
+      case 'peracikan_bumbu': return 'Peracikan Bumbu';
+      case 'unit_produksi': return 'Unit Produksi';
       case 'owner': return 'Owner';
       case 'manager': return 'Manager';
       case 'staff': return 'Staff';
@@ -115,12 +120,12 @@ export default function Index() {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['owner', 'manager', 'staff', 'investor'] },
-    { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['owner', 'manager', 'staff'] },
-    { icon: Package, label: 'Inventory', href: '/inventory', roles: ['owner', 'manager', 'staff'] },
-    { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['owner', 'manager', 'investor'] },
-    { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['owner', 'manager', 'investor'] },
-    { icon: Users, label: 'Pengguna', href: '/users', roles: ['owner'] },
+    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
+    { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['super_admin', 'owner', 'manager', 'staff'] },
+    { icon: Package, label: 'Inventory', href: '/inventory', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
+    { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
+    { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
+    { icon: Users, label: 'Pengguna', href: '/users', roles: ['super_admin', 'owner'] },
   ];
 
   const visibleMenus = menuItems.filter(item => role && item.roles.includes(role));
@@ -187,7 +192,7 @@ export default function Index() {
             </div>
 
             {/* Quick Stats for Owner/Manager */}
-            {(role === 'owner' || role === 'manager') && (
+            {(role === 'owner' || role === 'super_admin' || role === 'manager' || role === 'pengadaan') && (
               <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="stat-card">
                   <span className="stat-label">Penjualan Hari Ini</span>

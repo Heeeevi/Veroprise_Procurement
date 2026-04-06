@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useOutlet } from '@/hooks/useOutlet';
 import { formatCurrency } from '@/lib/utils';
@@ -35,6 +36,7 @@ export default function Products() {
     cost_price: '',
     category_id: '',
     is_active: true,
+    is_service: false,
   });
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function Products() {
   };
 
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = !searchQuery ||
+    const matchesSearch = !searchQuery || 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || p.category_id === selectedCategory;
@@ -79,6 +81,7 @@ export default function Products() {
         cost_price: (product as any).cost?.toString() || '0',
         category_id: product.category_id || '',
         is_active: product.is_active,
+        is_service: (product as any).is_service || false,
       });
     } else {
       setEditingProduct(null);
@@ -89,17 +92,13 @@ export default function Products() {
         cost_price: '0',
         category_id: categories[0]?.id || '',
         is_active: true,
+        is_service: false,
       });
     }
     setShowDialog(true);
   };
 
   const handleSave = async () => {
-    if (!selectedOutlet) {
-      toast({ title: 'Error', description: 'Pilih outlet terlebih dahulu dari sidebar', variant: 'destructive' });
-      return;
-    }
-
     if (!formData.name || !formData.price) {
       toast({ title: 'Error', description: 'Nama dan harga harus diisi', variant: 'destructive' });
       return;
@@ -113,6 +112,7 @@ export default function Products() {
         cost: parseFloat(formData.cost_price) || 0,
         category_id: formData.category_id || null,
         is_active: formData.is_active,
+        is_service: formData.is_service,
         outlet_id: selectedOutlet?.id,
       };
 
@@ -238,13 +238,14 @@ export default function Products() {
                     <TableHead className="text-right">HPP</TableHead>
                     <TableHead className="text-right">Margin</TableHead>
                     <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center">Tipe</TableHead>
                     <TableHead className="text-center">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Tidak ada produk ditemukan
                       </TableCell>
                     </TableRow>
@@ -263,22 +264,31 @@ export default function Products() {
                         <TableCell className="text-right font-medium">{formatCurrency(product.price)}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{formatCurrency((product as any).cost || 0)}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-medium ${Number(profitMargin(product.price, (product as any).cost || 0)) >= 30
-                              ? 'text-green-600'
-                              : Number(profitMargin(product.price, (product as any).cost || 0)) >= 15
-                                ? 'text-yellow-600'
+                          <span className={`font-medium ${
+                            Number(profitMargin(product.price, (product as any).cost || 0)) >= 30 
+                              ? 'text-green-600' 
+                              : Number(profitMargin(product.price, (product as any).cost || 0)) >= 15 
+                                ? 'text-yellow-600' 
                                 : 'text-red-600'
-                            }`}>
+                          }`}>
                             {profitMargin(product.price, (product as any).cost || 0)}%
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs ${product.is_active
-                              ? 'bg-green-100 text-green-700'
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            product.is_active 
+                              ? 'bg-green-100 text-green-700' 
                               : 'bg-gray-100 text-gray-600'
-                            }`}>
+                          }`}>
                             {product.is_active ? 'Aktif' : 'Nonaktif'}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {(product as any).is_service ? (
+                            <Badge variant="secondary">Layanan (tanpa stok)</Badge>
+                          ) : (
+                            <Badge variant="outline">Barang (sinkron inventory)</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-2">
@@ -399,6 +409,18 @@ export default function Products() {
                   id="is_active"
                   checked={formData.is_active}
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="is_service">Produk Ini Adalah Layanan</Label>
+                  <p className="text-xs text-muted-foreground">Jika aktif, item tidak muncul di halaman Inventory.</p>
+                </div>
+                <Switch
+                  id="is_service"
+                  checked={formData.is_service}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_service: checked })}
                 />
               </div>
             </div>

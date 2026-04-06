@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { AppRole, Profile } from '@/types/database';
+import type { AppRole, Profile, ProcurementRole } from '@/types/database';
 
 interface AuthContextType {
   user: User | null;
@@ -63,24 +63,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch profile (role is in profiles table)
       const { data: profileData, error: profileError } = await (supabase as any)
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      const { data: activeProcRole } = await (supabase as any)
+        .from('procurement_user_roles')
+        .select('role, is_active, updated_at')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       if (profileError) {
         console.error('Error fetching profile:', profileError);
       }
 
-      console.log('Profile data fetched:', profileData); // Debug log
-
       if (profileData) {
         setProfile(profileData as unknown as Profile);
-        // Always set role from profile (can be null)
-        const roleValue = profileData.role as AppRole | null;
-        console.log('Setting role to:', roleValue); // Debug log
+
+        // Prefer procurement role, fallback to legacy profile role.
+        const roleValue = (activeProcRole?.role as ProcurementRole | null) || (profileData.role as AppRole | null);
         setRole(roleValue);
       }
     } catch (error) {
@@ -128,9 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
-    isOwner: role === 'owner',
-    isManager: role === 'manager',
-    isStaff: role === 'staff',
+    isOwner: role === 'owner' || role === 'super_admin',
+    isManager:
+      role === 'manager' ||
+      role === 'pengadaan' ||
+      role === 'gudang' ||
+      role === 'peracikan_bumbu' ||
+      role === 'unit_produksi',
+    isStaff: role === 'staff' || role === 'unit_produksi' || role === 'peracikan_bumbu',
     isInvestor: role === 'investor',
   };
 

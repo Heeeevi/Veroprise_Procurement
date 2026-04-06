@@ -14,30 +14,32 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useOutlet } from '@/hooks/useOutlet';
 
 interface POItem {
     id: string;
-    inventory_item_id: string;
+    product_id: string;
     quantity: number;
-    unit_cost: number;
+    unit_price: number;
     subtotal: number;
-    inventory_item: {
+    product: {
         name: string;
-        unit: string;
     };
 }
 
 interface PurchaseOrder {
     id: string;
-    status: 'draft' | 'ordered' | 'received' | 'cancelled';
+    po_number: string;
+    status: 'draft' | 'submitted' | 'approved' | 'received' | 'cancelled';
     total_amount: number;
-    expected_date: string;
-    vendor: { name: string; email: string };
-    outlet_id: string;
+    supplier_name: string | null;
+    supplier: { name: string } | null;
+    ordered_by: string | null;
 }
 
 export default function PurchaseOrderDetail() {
     const { id } = useParams();
+    const { selectedOutlet } = useOutlet();
     const navigate = useNavigate();
     const { toast } = useToast();
     const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -54,7 +56,7 @@ export default function PurchaseOrderDetail() {
     // Receive State
     const [showReceiveDialog, setShowReceiveDialog] = useState(false);
     const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
-    const [batchExpiry, setBatchExpiry] = useState<Record<string, string>>({}); // itemId -> date
+    const [batchExpiry, setBatchExpiry] = useState<Record<string, string>>({}); // reserved for future enhancement
 
     useEffect(() => {
         if (id) {
@@ -67,7 +69,7 @@ export default function PurchaseOrderDetail() {
     const fetchPODetails = async () => {
         const { data } = await supabase
             .from('purchase_orders')
-            .select('*, vendor:vendors(*)')
+            .select('*, supplier:suppliers(name)')
             .eq('id', id)
             .single();
         setPo(data);
@@ -76,13 +78,18 @@ export default function PurchaseOrderDetail() {
     const fetchPOItems = async () => {
         const { data } = await supabase
             .from('purchase_order_items')
-            .select('*, inventory_item:inventory_items(name, unit)')
+            .select('*, product:products(name)')
             .eq('purchase_order_id', id);
         setItems(data || []);
     };
 
     const fetchInventoryList = async () => {
-        const { data } = await supabase.from('inventory_items').select('id, name, cost_per_unit').order('name');
+        const { data } = await supabase
+            .from('products')
+            .select('id, name, cost')
+            .eq('is_active', true)
+            .eq('is_service', false)
+            .order('name');
         setInventoryItems(data || []);
     };
 
@@ -96,9 +103,9 @@ export default function PurchaseOrderDetail() {
 
             const { error } = await supabase.from('purchase_order_items').insert({
                 purchase_order_id: id,
-                inventory_item_id: newItemId,
+                product_id: newItemId,
                 quantity: qty,
-                unit_cost: cost,
+                unit_price: cost,
                 subtotal: subtotal
             });
 
@@ -155,77 +162,91 @@ export default function PurchaseOrderDetail() {
 
     const handleReceiveItems = async () => {
         try {
+            if (!selectedOutlet?.id) {
+                toast({ title: 'Error', description: 'Pilih outlet aktif sebelum menerima barang', variant: 'destructive' });
+                return;
+            }
+
+            const currentUserId = (await supabase.auth.getUser()).data.user?.id;
+
             // 1. Update PO Status
             await supabase.from('purchase_orders').update({
                 status: 'received',
+                received_by: currentUserId,
+                received_date: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             }).eq('id', id);
 
-            // 2. Create Expense Record automatically
-            if (po && po.total_amount > 0) {
-                // Get or create 'Inventory Purchase' category
-                const { data: categories } = await supabase.from('expense_categories').select('id').eq('name', 'Inventory Purchase').single();
-                let categoryId = categories?.id;
+            // 2. Increase outlet inventory stock for all received items
+            for (const item of items) {
+                const qty = Number(item.quantity) || 0;
+                if (qty <= 0) continue;
 
-                if (!categoryId) {
-                    const { data: newCat } = await supabase.from('expense_categories').insert({ name: 'Inventory Purchase', description: 'Auto-generated from PO' }).select().single();
-                    categoryId = newCat?.id;
+                const { data: existingInventory, error: inventoryFetchError } = await (supabase as any)
+                    .from('inventory')
+                    .select('id, quantity')
+                    .eq('outlet_id', selectedOutlet.id)
+                    .eq('product_id', item.product_id)
+                    .maybeSingle();
+
+                if (inventoryFetchError) throw inventoryFetchError;
+
+                if (existingInventory) {
+                    const { error: updateInventoryError } = await (supabase as any)
+                        .from('inventory')
+                        .update({ quantity: Number(existingInventory.quantity || 0) + qty })
+                        .eq('id', existingInventory.id);
+
+                    if (updateInventoryError) throw updateInventoryError;
+                } else {
+                    const { error: insertInventoryError } = await (supabase as any)
+                        .from('inventory')
+                        .insert({
+                            outlet_id: selectedOutlet.id,
+                            product_id: item.product_id,
+                            quantity: qty,
+                            min_quantity: 0,
+                            unit: 'pcs',
+                            is_active: true,
+                        });
+
+                    if (insertInventoryError) throw insertInventoryError;
                 }
 
+                const { error: transactionError } = await (supabase as any)
+                    .from('inventory_transactions')
+                    .insert({
+                        outlet_id: selectedOutlet.id,
+                        product_id: item.product_id,
+                        transaction_type: 'purchase',
+                        quantity: qty,
+                        unit_cost: Number(item.unit_price) || 0,
+                        total_cost: Number(item.subtotal) || 0,
+                        reference_id: id,
+                        reference_type: 'purchase_order',
+                        notes: `Penerimaan dari PO #${po?.po_number || id?.substring(0, 8)}`,
+                        performed_by: currentUserId,
+                        transaction_date: new Date(`${receiveDate}T00:00:00`).toISOString(),
+                    });
+
+                if (transactionError) throw transactionError;
+            }
+
+            // 3. Create Expense Record automatically
+            if (po && po.total_amount > 0 && selectedOutlet?.id) {
                 await supabase.from('expenses').insert({
-                    outlet_id: po.outlet_id,
-                    user_id: (await supabase.auth.getUser()).data.user?.id,
-                    category_id: categoryId,
+                    outlet_id: selectedOutlet?.id,
+                    created_by: currentUserId,
+                    category: 'supplies',
                     amount: po.total_amount,
-                    description: `Purchase Order #${id?.substring(0, 8)} - ${po.vendor?.name}`,
+                    description: `Purchase Order #${po.po_number || id?.substring(0, 8)} - ${po.supplier?.name || po.supplier_name || 'Supplier'}`,
                     expense_date: receiveDate,
-                    status: 'approved', // Auto-approve PO expenses
-                    notes: 'Auto-generated from Inventory Receive'
+                    status: 'approved' // Auto-approve PO expenses
                 });
             }
 
-            // 3. Create Inventory Batches & Update Stock for each item
-            for (const item of items) {
-                const expiryDate = batchExpiry[item.id] || null;
-
-                // Create Batch
-                await supabase.from('inventory_batches').insert({
-                    inventory_item_id: item.inventory_item_id,
-                    outlet_id: po?.outlet_id,
-                    initial_quantity: item.quantity,
-                    current_quantity: item.quantity, // Full amount received
-                    expiration_date: expiryDate,
-                    received_date: receiveDate,
-                    purchase_order_id: id,
-                    sku_batch: `PO-${id?.substring(0, 6)}`
-                });
-
-                // Update Main Inventory Stock (Increment)
-                // Note: Ideally allow partial receiving, but for MVP assuming full receive
-                const { data: currentItem } = await supabase
-                    .from('inventory_items')
-                    .select('current_stock')
-                    .eq('id', item.inventory_item_id)
-                    .single();
-
-                const newStock = (currentItem?.current_stock || 0) + item.quantity;
-
-                await supabase.from('inventory_items')
-                    .update({ current_stock: newStock })
-                    .eq('id', item.inventory_item_id);
-
-                // Generate Transaction Log
-                await supabase.from('inventory_transactions').insert({
-                    outlet_id: po?.outlet_id,
-                    inventory_item_id: item.inventory_item_id,
-                    user_id: (await supabase.auth.getUser()).data.user?.id,
-                    type: 'purchase',
-                    quantity: item.quantity,
-                    notes: `Received from PO #${id?.substring(0, 8)}`
-                });
-            }
-
-            toast({ title: 'Barang Diterima!', description: 'Stok dan Batch telah diupdate.' });
+            // Inventory warehouse will still be updated by DB trigger; outlet inventory is updated above.
+            toast({ title: 'Barang Diterima!', description: 'Status PO dan stok inventory outlet berhasil diperbarui.' });
             setShowReceiveDialog(false);
             fetchPODetails();
 
@@ -247,19 +268,19 @@ export default function PurchaseOrderDetail() {
                         <div>
                             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
                                 PO #{po.id.substring(0, 8)}
-                                <Badge variant={po.status === 'ordered' ? 'default' : 'outline'}>{po.status.toUpperCase()}</Badge>
+                                <Badge variant={(po.status === 'submitted' || po.status === 'approved') ? 'default' : 'outline'}>{po.status.toUpperCase()}</Badge>
                             </h1>
-                            <p className="text-muted-foreground">{po.vendor?.name}</p>
+                            <p className="text-muted-foreground">{po.supplier?.name || po.supplier_name || '-'}</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         {po.status === 'draft' && (
-                            <Button onClick={() => handleStatusChange('ordered')} className="bg-blue-600 hover:bg-blue-700">
+                            <Button onClick={() => handleStatusChange('submitted')} className="bg-blue-600 hover:bg-blue-700">
                                 <Send className="h-4 w-4 mr-2" />
                                 Kirim Order
                             </Button>
                         )}
-                        {po.status === 'ordered' && (
+                        {(po.status === 'submitted' || po.status === 'approved') && (
                             <Button onClick={() => handleStatusChange('received')} className="bg-green-600 hover:bg-green-700">
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Terima Barang
@@ -296,9 +317,9 @@ export default function PurchaseOrderDetail() {
                                 ) : (
                                     items.map(item => (
                                         <TableRow key={item.id}>
-                                            <TableCell>{item.inventory_item?.name}</TableCell>
-                                            <TableCell className="text-right">{item.quantity} {item.inventory_item?.unit}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(item.unit_cost)}</TableCell>
+                                            <TableCell>{item.product?.name}</TableCell>
+                                            <TableCell className="text-right">{item.quantity}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
                                             <TableCell className="text-right">
                                                 {po.status === 'draft' && (
@@ -330,7 +351,7 @@ export default function PurchaseOrderDetail() {
                                 <Select value={newItemId} onValueChange={(val) => {
                                     setNewItemId(val);
                                     const item = inventoryItems.find(i => i.id === val);
-                                    if (item) setNewItemCost(item.cost_per_unit?.toString() || '0');
+                                    if (item) setNewItemCost(item.cost?.toString() || '0');
                                 }}>
                                     <SelectTrigger><SelectValue placeholder="Pilih Inventory Item" /></SelectTrigger>
                                     <SelectContent>
@@ -378,8 +399,8 @@ export default function PurchaseOrderDetail() {
                                 <TableBody>
                                     {items.map(item => (
                                         <TableRow key={item.id}>
-                                            <TableCell>{item.inventory_item?.name}</TableCell>
-                                            <TableCell className="text-right">{item.quantity} {item.inventory_item?.unit}</TableCell>
+                                            <TableCell>{item.product?.name}</TableCell>
+                                            <TableCell className="text-right">{item.quantity}</TableCell>
                                             <TableCell>
                                                 <Input
                                                     type="date"

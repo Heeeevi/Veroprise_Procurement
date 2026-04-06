@@ -1,6 +1,14 @@
 // Custom type definitions for the ERP system
 
-export type AppRole = 'owner' | 'manager' | 'staff' | 'investor';
+export type LegacyRole = 'owner' | 'manager' | 'staff' | 'investor' | 'customer';
+export type ProcurementRole =
+  | 'super_admin'
+  | 'pengadaan'
+  | 'gudang'
+  | 'peracikan_bumbu'
+  | 'unit_produksi'
+  | 'owner';
+export type AppRole = LegacyRole | ProcurementRole;
 
 export type PaymentMethod = 'cash' | 'qris' | 'transfer' | 'card' | 'split';
 
@@ -14,6 +22,7 @@ export interface Profile {
   full_name: string;
   avatar_url: string | null;
   phone: string | null;
+  role: AppRole | null;
   created_at: string;
   updated_at: string;
 }
