@@ -14,10 +14,30 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useOutlet } from '@/hooks/useOutlet';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Edit, Trash2, Package, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Search, ListTree } from 'lucide-react';
 import type { Product, Category } from '@/types/database';
 
+interface ProductOption {
+  id: string;
+  name: string;
+}
+
+interface ProductBomItemForm {
+  id?: string;
+  ingredient_product_id: string;
+  quantity: string;
+  unit: string;
+  notes: string;
+}
+
 export default function Products() {
+  const projectRef = (() => {
+    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    if (!url) return 'unknown';
+    const match = url.match(/https:\/\/([^.]+)\.supabase\.co/i);
+    return match?.[1] || 'unknown';
+  })();
+
   const { toast } = useToast();
   const { selectedOutlet } = useOutlet();
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,6 +49,12 @@ export default function Products() {
   // Dialog states
   const [showDialog, setShowDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showBomDialog, setShowBomDialog] = useState(false);
+  const [bomProduct, setBomProduct] = useState<Product | null>(null);
+  const [bomLoading, setBomLoading] = useState(false);
+  const [bomItems, setBomItems] = useState<ProductBomItemForm[]>([]);
+  const [ingredientOptions, setIngredientOptions] = useState<ProductOption[]>([]);
+  const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -55,6 +81,18 @@ export default function Products() {
 
       setProducts((productsRes.data || []) as unknown as Product[]);
       setCategories((categoriesRes.data || []) as unknown as Category[]);
+
+      const { data: bomRows, error: bomError } = await (supabase as any)
+        .from('product_bom_items')
+        .select('product_id');
+
+      if (!bomError) {
+        const nextCounts: Record<string, number> = {};
+        (bomRows || []).forEach((row: any) => {
+          nextCounts[row.product_id] = (nextCounts[row.product_id] || 0) + 1;
+        });
+        setBomCounts(nextCounts);
+      }
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -155,6 +193,144 @@ export default function Products() {
     }
   };
 
+  const addBomRow = () => {
+    setBomItems((prev) => [
+      ...prev,
+      {
+        ingredient_product_id: '',
+        quantity: '1',
+        unit: 'pcs',
+        notes: '',
+      },
+    ]);
+  };
+
+  const updateBomRow = (index: number, patch: Partial<ProductBomItemForm>) => {
+    setBomItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  };
+
+  const removeBomRow = (index: number) => {
+    setBomItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleOpenBomDialog = async (product: Product) => {
+    setBomProduct(product);
+    setShowBomDialog(true);
+    setBomLoading(true);
+
+    try {
+      const [optionsRes, bomRes] = await Promise.all([
+        (supabase as any)
+          .from('products')
+          .select('id, name, is_service, is_active')
+          .eq('is_active', true)
+          .order('name'),
+        (supabase as any)
+          .from('product_bom_items')
+          .select('id, ingredient_product_id, quantity, unit, notes')
+          .eq('product_id', product.id)
+          .order('created_at', { ascending: true }),
+      ]);
+
+      if (optionsRes.error) throw optionsRes.error;
+      if (bomRes.error) throw bomRes.error;
+
+      const options = (optionsRes.data || [])
+        .filter((item: any) => item.id !== product.id && !item.is_service)
+        .map((item: any) => ({ id: item.id, name: item.name }));
+
+      setIngredientOptions(options);
+
+      const existingBom: ProductBomItemForm[] = (bomRes.data || []).map((row: any) => ({
+        id: row.id,
+        ingredient_product_id: row.ingredient_product_id,
+        quantity: String(row.quantity ?? '1'),
+        unit: row.unit || 'pcs',
+        notes: row.notes || '',
+      }));
+
+      setBomItems(
+        existingBom.length > 0
+          ? existingBom
+          : [
+              {
+                ingredient_product_id: '',
+                quantity: '1',
+                unit: 'pcs',
+                notes: '',
+              },
+            ]
+      );
+    } catch (error: any) {
+      const isSchemaCacheError =
+        typeof error?.message === 'string' &&
+        (error.message.includes('schema cache') || error.message.includes('Could not find the table'));
+
+      toast({
+        title: 'BOM belum siap',
+        description: isSchemaCacheError
+          ? `Tabel BOM belum terbaca oleh API. Project app saat ini: ${projectRef}. Jalankan migration BOM di project itu, lalu GRANT untuk role authenticated/anon.`
+          : error.message || 'Tabel BOM belum tersedia. Jalankan migration BOM terlebih dahulu, lalu coba lagi.',
+        variant: 'destructive',
+      });
+      setShowBomDialog(false);
+    } finally {
+      setBomLoading(false);
+    }
+  };
+
+  const handleSaveBom = async () => {
+    if (!bomProduct) return;
+
+    const validRows = bomItems
+      .filter((row) => row.ingredient_product_id && (parseFloat(row.quantity) || 0) > 0)
+      .map((row) => ({
+        ingredient_product_id: row.ingredient_product_id,
+        quantity: parseFloat(row.quantity),
+        unit: row.unit || 'pcs',
+        notes: row.notes || null,
+      }));
+
+    const uniqueIngredientCount = new Set(validRows.map((r) => r.ingredient_product_id)).size;
+    if (uniqueIngredientCount !== validRows.length) {
+      toast({
+        title: 'Error',
+        description: 'Bahan tidak boleh duplikat dalam satu BOM produk.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const { error: clearError } = await (supabase as any)
+        .from('product_bom_items')
+        .delete()
+        .eq('product_id', bomProduct.id);
+
+      if (clearError) throw clearError;
+
+      if (validRows.length > 0) {
+        const payload = validRows.map((row) => ({
+          product_id: bomProduct.id,
+          ingredient_product_id: row.ingredient_product_id,
+          quantity: row.quantity,
+          unit: row.unit,
+          notes: row.notes,
+        }));
+
+        const { error: insertError } = await (supabase as any).from('product_bom_items').insert(payload);
+        if (insertError) throw insertError;
+      }
+
+      toast({ title: 'Sukses', description: 'BOM produk berhasil disimpan' });
+      setShowBomDialog(false);
+      setBomProduct(null);
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return '-';
     const category = categories.find((c) => c.id === categoryId);
@@ -238,14 +414,15 @@ export default function Products() {
                     <TableHead className="text-right">HPP</TableHead>
                     <TableHead className="text-right">Margin</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Tipe</TableHead>
+                    <TableHead className="text-center">Tipe</TableHead>
+                    <TableHead className="text-center">BOM</TableHead>
                     <TableHead className="text-center">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         Tidak ada produk ditemukan
                       </TableCell>
                     </TableRow>
@@ -290,8 +467,26 @@ export default function Products() {
                             <Badge variant="outline">Barang (sinkron inventory)</Badge>
                           )}
                         </TableCell>
+                        <TableCell className="text-center">
+                          {(product as any).is_service ? (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          ) : (bomCounts[product.id] || 0) > 0 ? (
+                            <Badge variant="secondary">{bomCounts[product.id]} bahan</Badge>
+                          ) : (
+                            <Badge variant="outline">Tanpa BOM</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenBomDialog(product)}
+                              disabled={(product as any).is_service}
+                            >
+                              <ListTree className="h-4 w-4 mr-1" />
+                              BOM
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -429,6 +624,102 @@ export default function Products() {
               <Button onClick={handleSave}>
                 {editingProduct ? 'Update' : 'Simpan'}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showBomDialog} onOpenChange={setShowBomDialog}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-display">
+                BOM Produk: {bomProduct?.name || '-'}
+              </DialogTitle>
+            </DialogHeader>
+
+            {bomLoading ? (
+              <div className="py-10 flex justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto">
+                <p className="text-sm text-muted-foreground">
+                  Tentukan bahan yang dipotong dari inventory setiap 1 unit produk terjual.
+                </p>
+
+                {bomItems.map((row, idx) => (
+                  <div key={row.id || idx} className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg border">
+                    <div className="col-span-12 md:col-span-5 space-y-1">
+                      <Label>Bahan</Label>
+                      <Select
+                        value={row.ingredient_product_id}
+                        onValueChange={(v) => updateBomRow(idx, { ingredient_product_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih bahan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ingredientOptions.map((opt) => (
+                            <SelectItem key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="col-span-6 md:col-span-2 space-y-1">
+                      <Label>Qty</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.quantity}
+                        onChange={(e) => updateBomRow(idx, { quantity: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="col-span-6 md:col-span-2 space-y-1">
+                      <Label>Satuan</Label>
+                      <Input
+                        value={row.unit}
+                        onChange={(e) => updateBomRow(idx, { unit: e.target.value })}
+                        placeholder="pcs"
+                      />
+                    </div>
+
+                    <div className="col-span-10 md:col-span-2 space-y-1">
+                      <Label>Catatan</Label>
+                      <Input
+                        value={row.notes}
+                        onChange={(e) => updateBomRow(idx, { notes: e.target.value })}
+                        placeholder="Opsional"
+                      />
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1 pt-7 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeBomRow(idx)}
+                        disabled={bomItems.length <= 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button type="button" variant="outline" onClick={addBomRow}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Bahan
+                </Button>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBomDialog(false)}>Batal</Button>
+              <Button onClick={handleSaveBom} disabled={bomLoading}>Simpan BOM</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
