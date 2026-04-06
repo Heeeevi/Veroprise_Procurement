@@ -170,22 +170,36 @@ export default function POS() {
         : [{ method: paymentMethod, amount: total }];
 
       // Create transaction
-      const { data: transaction, error: txError } = await (supabase as any)
+      const transactionData = {
+        outlet_id: selectedOutlet.id,
+        shift_id: currentShift.id,
+        created_by: user.id,
+        subtotal,
+        tax,
+        total,
+        payment_method: finalPaymentMethod,
+        payment_details: paymentDetails,
+        is_split_payment: isMultiPayment,
+        transaction_number: transactionNumber,
+      };
+
+      let transactionResult = await (supabase as any)
         .from('transactions')
-        .insert({
-          outlet_id: selectedOutlet.id,
-          shift_id: currentShift.id,
-          created_by: user.id,
-          subtotal,
-          tax,
-          total,
-          payment_method: finalPaymentMethod,
-          payment_details: paymentDetails,
-          is_split_payment: isMultiPayment,
-          transaction_number: transactionNumber,
-        })
+        .insert(transactionData)
         .select()
         .single();
+
+      if (transactionResult.error && String(transactionResult.error.message || '').toLowerCase().includes('shift_id')) {
+        console.warn('Retrying transaction insert without shift_id because the column is not available yet.');
+        const { shift_id: _shiftId, ...fallbackTransactionData } = transactionData;
+        transactionResult = await (supabase as any)
+          .from('transactions')
+          .insert(fallbackTransactionData)
+          .select()
+          .single();
+      }
+
+      const { data: transaction, error: txError } = transactionResult;
 
       if (txError) throw txError;
 

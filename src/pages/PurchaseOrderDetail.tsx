@@ -233,12 +233,16 @@ export default function PurchaseOrderDetail() {
             }
 
             // 3. Create Expense Record automatically
-            if (po && po.total_amount > 0 && selectedOutlet?.id) {
+            const poTotalAmount = Number(po?.total_amount || 0);
+            const itemTotalAmount = items.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
+            const expenseAmount = poTotalAmount > 0 ? poTotalAmount : itemTotalAmount;
+
+            if (po && expenseAmount > 0 && selectedOutlet?.id) {
                 await supabase.from('expenses').insert({
                     outlet_id: selectedOutlet?.id,
                     created_by: currentUserId,
                     category: 'supplies',
-                    amount: po.total_amount,
+                    amount: expenseAmount,
                     description: `Purchase Order #${po.po_number || id?.substring(0, 8)} - ${po.supplier?.name || po.supplier_name || 'Supplier'}`,
                     expense_date: receiveDate,
                     status: 'approved' // Auto-approve PO expenses

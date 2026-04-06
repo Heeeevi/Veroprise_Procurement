@@ -50,3 +50,8 @@ CREATE TRIGGER trg_pos_shifts_updated_at
 BEFORE UPDATE ON pos_shifts
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE transactions
+  ADD COLUMN IF NOT EXISTS shift_id UUID REFERENCES pos_shifts(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_transactions_shift_id ON transactions(shift_id);
