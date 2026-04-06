@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useOutlet } from '@/hooks/useOutlet';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Edit, Trash2, Package, Search, ListTree } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Search, ListTree, Settings } from 'lucide-react';
 import type { Product, Category } from '@/types/database';
 
 interface ProductOption {
@@ -50,6 +50,12 @@ export default function Products() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showBomDialog, setShowBomDialog] = useState(false);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    description: '',
+  });
   const [bomProduct, setBomProduct] = useState<Product | null>(null);
   const [bomLoading, setBomLoading] = useState(false);
   const [bomItems, setBomItems] = useState<ProductBomItemForm[]>([]);
@@ -213,6 +219,74 @@ export default function Products() {
     setBomItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleOpenCategoryDialog = (category?: Category) => {
+    if (category) {
+      setEditingCategory(category);
+      setCategoryForm({
+        name: category.name,
+        description: category.description || '',
+      });
+    } else {
+      setEditingCategory(null);
+      setCategoryForm({
+        name: '',
+        description: '',
+      });
+    }
+    setShowCategoryDialog(true);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryForm.name.trim()) {
+      toast({ title: 'Error', description: 'Nama kategori harus diisi', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const categoryData = {
+        name: categoryForm.name.trim(),
+        description: categoryForm.description || null,
+      };
+
+      if (editingCategory) {
+        const { error } = await supabase
+          .from('categories')
+          .update(categoryData)
+          .eq('id', editingCategory.id);
+
+        if (error) throw error;
+        toast({ title: 'Sukses', description: 'Kategori berhasil diupdate' });
+      } else {
+        const { error } = await supabase
+          .from('categories')
+          .insert(categoryData);
+
+        if (error) throw error;
+        toast({ title: 'Sukses', description: 'Kategori berhasil ditambahkan' });
+      }
+
+      setShowCategoryDialog(false);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error saving category:', error);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Apakah Anda yakin? Produk dengan kategori ini akan berubah ke kategori kosong.')) return;
+
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Sukses', description: 'Kategori berhasil dihapus' });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleOpenBomDialog = async (product: Product) => {
     setBomProduct(product);
     setShowBomDialog(true);
@@ -361,10 +435,16 @@ export default function Products() {
             <h1 className="text-2xl font-display font-bold">Produk & Layanan</h1>
             <p className="text-muted-foreground">Kelola produk, harga jual, dan HPP</p>
           </div>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Tambah Produk
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => handleOpenCategoryDialog()}>
+              <Settings className="h-4 w-4 mr-2" />
+              Atur Kategori
+            </Button>
+            <Button onClick={() => handleOpenDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Tambah Produk
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -720,6 +800,88 @@ export default function Products() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowBomDialog(false)}>Batal</Button>
               <Button onClick={handleSaveBom} disabled={bomLoading}>Simpan BOM</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Category Management Dialog */}
+        <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-display">
+                {editingCategory ? 'Edit Kategori' : 'Tambah Kategori Baru'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Form untuk tambah/edit */}
+              <div className="space-y-3 border-b pb-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category-name">Nama Kategori *</Label>
+                  <Input
+                    id="category-name"
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                    placeholder="Contoh: Perawatan, Styling, dsb"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category-desc">Deskripsi</Label>
+                  <Textarea
+                    id="category-desc"
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                    placeholder="Deskripsi kategori (opsional)"
+                    rows={2}
+                  />
+                </div>
+                <Button onClick={handleSaveCategory} className="w-full">
+                  {editingCategory ? 'Update Kategori' : 'Tambah Kategori'}
+                </Button>
+              </div>
+
+              {/* List kategori */}
+              <div>
+                <h3 className="font-semibold mb-3">Daftar Kategori (Total: {categories.length})</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {categories.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">Belum ada kategori</p>
+                  ) : (
+                    categories.map((cat) => (
+                      <div
+                        key={cat.id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">{cat.name}</p>
+                          {cat.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">{cat.description}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenCategoryDialog(cat)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(cat.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>Tutup</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
