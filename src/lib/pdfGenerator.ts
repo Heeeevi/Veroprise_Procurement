@@ -25,6 +25,7 @@ interface ReportData {
         pending: number;
         totalRevenue: number;
     };
+    expenseDetails?: { date: string; category: string; description: string; amount: number }[];
 }
 
 const formatCurrency = (value: number) => {
@@ -330,6 +331,65 @@ export async function generateReportPDF(data: ReportData): Promise<void> {
         pdf.setFillColor(248, 250, 252);
         pdf.roundedRect(margin, yPos, pageWidth - margin * 2, 25, 2, 2, 'F');
         addText('Belum ada data layanan di periode ini', pageWidth / 2, yPos + 15, { fontSize: 10, color: [150, 150, 150], align: 'center' });
+    }
+
+    // Expenses Details Section
+    if (data.expenseDetails && data.expenseDetails.length > 0) {
+        if (yPos > pageHeight - 40) {
+            pdf.addPage();
+            yPos = margin;
+        } else {
+            yPos += 15;
+        }
+
+        addText('Rincian Pengeluaran (Expenses)', margin, yPos, { fontSize: 14, fontStyle: 'bold' });
+        yPos += 8;
+
+        // Table header
+        pdf.setFillColor(239, 68, 68); // Red color for expenses header
+        pdf.rect(margin, yPos, pageWidth - margin * 2, 10, 'F');
+
+        addText('Tgl', margin + 3, yPos + 7, { fontSize: 8, fontStyle: 'bold', color: [255, 255, 255] });
+        addText('Kategori', margin + 20, yPos + 7, { fontSize: 8, fontStyle: 'bold', color: [255, 255, 255] });
+        addText('Deskripsi', margin + 60, yPos + 7, { fontSize: 8, fontStyle: 'bold', color: [255, 255, 255] });
+        addText('Jumlah', pageWidth - margin - 3, yPos + 7, { fontSize: 8, fontStyle: 'bold', color: [255, 255, 255], align: 'right' });
+
+        yPos += 10;
+
+        // Rows
+        data.expenseDetails.forEach((exp, idx) => {
+            if (yPos > pageHeight - 30) {
+                pdf.addPage();
+                yPos = margin;
+            }
+
+            pdf.setFillColor(idx % 2 === 0 ? 254 : 255, 242, 242);
+            pdf.rect(margin, yPos, pageWidth - margin * 2, 9, 'F');
+
+            const dateStr = exp.date ? new Date(exp.date).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : '-';
+            
+            addText(dateStr, margin + 3, yPos + 6, { fontSize: 8, color: [100, 116, 139] });
+            addText((exp.category || '').substring(0, 18).toUpperCase(), margin + 20, yPos + 6, { fontSize: 8, fontStyle: 'bold' });
+            addText((exp.description || 'Pengeluaran').substring(0, 55), margin + 60, yPos + 6, { fontSize: 8 });
+            addText(formatCurrency(exp.amount), pageWidth - margin - 3, yPos + 6, { fontSize: 8, fontStyle: 'bold', color: [220, 38, 38], align: 'right' });
+
+            yPos += 9;
+        });
+
+        // Total
+        yPos += 2;
+        if (yPos > pageHeight - 20) {
+            pdf.addPage();
+            yPos = margin;
+        }
+        
+        pdf.setFillColor(254, 202, 202);
+        pdf.rect(margin, yPos, pageWidth - margin * 2, 10, 'F');
+        addText('TOTAL PENGELUARAN', margin + 60, yPos + 7, { fontSize: 9, fontStyle: 'bold', color: [153, 27, 27] });
+        const totalExp = data.expenseDetails.reduce((sum, e) => sum + e.amount, 0);
+        addText(formatCurrency(totalExp), pageWidth - margin - 3, yPos + 7, { fontSize: 9, fontStyle: 'bold', color: [153, 27, 27], align: 'right' });
+        
+        yPos += 15;
     }
 
     // Footer Page 2

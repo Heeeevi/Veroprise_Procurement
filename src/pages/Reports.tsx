@@ -329,6 +329,26 @@ export default function Reports() {
         totalRevenue: bookingsData?.filter(b => b.payment_status === 'paid').reduce((sum, b) => sum + Number(b.payment_amount || 0), 0) || 0,
       };
 
+      // Fetch expenses for PDF details
+      let expensesPdfQuery = supabase
+        .from('expenses')
+        .select('*')
+        .eq('status', 'approved')
+        .gte('created_at', startDate.toISOString());
+
+      if (reportOutletId !== 'all') {
+        expensesPdfQuery = expensesPdfQuery.eq('outlet_id', reportOutletId);
+      }
+
+      const { data: expensesPdfData } = await expensesPdfQuery;
+
+      const expenseDetails = (expensesPdfData || []).map(exp => ({
+        date: exp.expense_date || exp.created_at,
+        category: exp.category,
+        description: exp.description || '',
+        amount: Number(exp.amount)
+      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       const reportData: ReportData = {
         outletName: getSelectedOutletName(),
         periodLabel: period === 'week' ? '7 Hari Terakhir' : period === 'month' ? 'Bulan Ini' : 'Tahun Ini',
@@ -346,6 +366,7 @@ export default function Reports() {
         dailyData: stats.dailyData,
         allServices,
         bookingStats,
+        expenseDetails,
       };
 
       await generateReportPDF(reportData);

@@ -68,19 +68,40 @@ export default function Inventory() {
     cost_per_unit: '',
   });
 
-  // Batch viewing state
-  const [selectedItemForBatches, setSelectedItemForBatches] = useState<InventoryItemWithStock | null>(null);
-  const [batches, setBatches] = useState<any[]>([]);
+  // Stock Ledger state
+  const [selectedItemForLedger, setSelectedItemForLedger] = useState<InventoryItemWithStock | null>(null);
+  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
 
   useEffect(() => {
-    if (selectedItemForBatches) {
-      fetchBatches(selectedItemForBatches.id);
+    if (selectedItemForLedger) {
+      fetchLedger(selectedItemForLedger.id);
     }
-  }, [selectedItemForBatches]);
+  }, [selectedItemForLedger]);
 
-  const fetchBatches = async (itemId: string) => {
-    // Batch module is not available in the current procurement schema.
-    setBatches([]);
+  const fetchLedger = async (itemId: string) => {
+    if (!selectedOutlet) return;
+    try {
+      const { data, error } = await supabase
+        .from('inventory_transactions')
+        .select(`
+          id,
+          transaction_type,
+          quantity,
+          notes,
+          transaction_date,
+          performed_by,
+          profiles:performed_by (full_name)
+        `)
+        .eq('product_id', itemId)
+        .eq('outlet_id', selectedOutlet.id)
+        .order('transaction_date', { ascending: false });
+
+      if (error) throw error;
+      setLedgerEntries(data || []);
+    } catch (error) {
+      console.error('Error fetching ledger:', error);
+      toast({ title: 'Error', description: 'Gagal memuat kartu stok', variant: 'destructive' });
+    }
   };
 
   useEffect(() => {
@@ -557,10 +578,10 @@ export default function Inventory() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedItemForBatches(item)}
+                        onClick={() => setSelectedItemForLedger(item)}
                       >
-                        <Calendar className="h-4 w-4 mr-1" />
-                        Batches
+                        <FileText className="h-4 w-4 mr-1" />
+                        Kartu Stok
                       </Button>
                       {(isOwner || isManager) && (
                         <Button
@@ -733,47 +754,48 @@ export default function Inventory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Batch Details Dialog */}
-      <Dialog open={!!selectedItemForBatches} onOpenChange={(open) => !open && setSelectedItemForBatches(null)}>
-        <DialogContent className="max-w-2xl">
+      {/* Kartu Stok Dialog */}
+      <Dialog open={!!selectedItemForLedger} onOpenChange={(open) => !open && setSelectedItemForLedger(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-display">Detail Batch - {selectedItemForBatches?.name}</DialogTitle>
+            <DialogTitle className="font-display">Kartu Stok - {selectedItemForLedger?.name}</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Batch Code</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Received Date</TableHead>
-                  <TableHead>Expiry Date</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Tipe</TableHead>
+                  <TableHead>In</TableHead>
+                  <TableHead>Out</TableHead>
+                  <TableHead>Balance</TableHead>
+                  <TableHead>Catatan</TableHead>
+                  <TableHead>Oleh</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {batches.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Tidak ada data batch</TableCell></TableRow>
+                {ledgerEntries.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Tidak ada riwayat transaksi stok</TableCell></TableRow>
                 ) : (
-                  batches.map(batch => {
-                    const isExpired = batch.expiration_date && new Date(batch.expiration_date) < new Date();
-                    const isNearExpiry = batch.expiration_date && new Date(batch.expiration_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-                    return (
-                      <TableRow key={batch.id}>
-                        <TableCell className="font-mono text-xs">{batch.sku_batch || '-'}</TableCell>
-                        <TableCell>{batch.current_quantity}</TableCell>
-                        <TableCell>{batch.received_date ? new Date(batch.received_date).toLocaleDateString('id-ID') : '-'}</TableCell>
-                        <TableCell className={isExpired ? 'text-red-600 font-bold' : isNearExpiry ? 'text-amber-600 font-semibold' : ''}>
-                          {batch.expiration_date ? new Date(batch.expiration_date).toLocaleDateString('id-ID') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {isExpired ? <Badge variant="destructive">Expired</Badge> :
-                            isNearExpiry ? <Badge variant="secondary" className="bg-amber-100 text-amber-800">Near Expiry</Badge> :
-                              <Badge variant="outline">Good</Badge>}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  (() => {
+                    let currentBalance = selectedItemForLedger?.current_stock || 0;
+                    return ledgerEntries.map(entry => {
+                      const qty = Number(entry.quantity);
+                      const displayBalance = currentBalance;
+                      currentBalance -= qty; // reverse it for the previous row
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell>{new Date(entry.transaction_date).toLocaleString('id-ID')}</TableCell>
+                          <TableCell className="capitalize">{entry.transaction_type.replace(/_/g, ' ')}</TableCell>
+                          <TableCell className="text-green-600 font-medium">{qty > 0 ? qty : '-'}</TableCell>
+                          <TableCell className="text-red-600 font-medium">{qty < 0 ? Math.abs(qty) : '-'}</TableCell>
+                          <TableCell className="font-bold">{displayBalance}</TableCell>
+                          <TableCell>{entry.notes || '-'}</TableCell>
+                          <TableCell>{(entry as any).profiles?.full_name || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()
                 )}
               </TableBody>
             </Table>

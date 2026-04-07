@@ -74,6 +74,34 @@ export function OutletProvider({ children }: { children: ReactNode }) {
     fetchOutlets();
   }, [user, role]);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const channel = supabase
+      .channel('outlet-context-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'outlets' },
+        () => {
+          fetchOutlets();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_outlets' },
+        () => {
+          fetchOutlets();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, role]);
+
   const value: OutletContextType = {
     outlets,
     selectedOutlet,

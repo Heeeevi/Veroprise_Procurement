@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useOutlet } from '@/hooks/useOutlet';
 import { supabase } from '@/integrations/supabase/client';
 import { createClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ interface UserWithRole {
 
 export default function Users() {
   const { isOwner, user: currentUser } = useAuth();
+  const { refetch: refetchOutlets } = useOutlet();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -438,6 +440,8 @@ export default function Users() {
           name: outletForm.name,
           address: outletForm.address || '',
           phone: outletForm.phone,
+          status: 'active',
+          is_active: true,
         });
 
       if (error) throw error;
@@ -446,6 +450,7 @@ export default function Users() {
       setShowAddOutletDialog(false);
       setOutletForm({ name: '', address: '', phone: '' });
       fetchOutlets();
+      refetchOutlets();
     } catch (error: any) {
       console.error('Error adding outlet:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -477,6 +482,7 @@ export default function Users() {
       setSelectedOutlet(null);
       fetchOutlets();
       fetchUsers(); // Refresh to show updated outlet names
+      refetchOutlets();
     } catch (error: any) {
       console.error('Error updating outlet:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -507,6 +513,7 @@ export default function Users() {
       setSelectedOutlet(null);
       fetchOutlets();
       fetchUsers();
+      refetchOutlets();
     } catch (error: any) {
       console.error('Error deleting outlet:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });

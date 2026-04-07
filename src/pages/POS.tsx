@@ -109,6 +109,16 @@ export default function POS() {
     );
   };
 
+  const setQuantity = (productId: string, quantity: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.product.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
   };
@@ -417,7 +427,23 @@ export default function POS() {
                       <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, -1)}>
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                      <Input
+                        type="number"
+                        min="1"
+                        className="w-14 h-6 text-center text-sm px-1 py-0 hide-spin-button"
+                        value={item.quantity || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) {
+                            setQuantity(item.product.id, val);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value || parseInt(e.target.value) < 1) {
+                            setQuantity(item.product.id, 1);
+                          }
+                        }}
+                      />
                       <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 1)}>
                         <Plus className="h-3 w-3" />
                       </Button>
