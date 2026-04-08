@@ -27,6 +27,7 @@ interface ProductBomItemForm {
   ingredient_product_id: string;
   quantity: string;
   unit: string;
+  yield_percentage: string;
   notes: string;
 }
 
@@ -69,6 +70,9 @@ export default function Products() {
     category_id: '',
     is_active: true,
     is_service: false,
+    purchase_unit: '',
+    base_unit: '',
+    conversion_rate: '1',
   });
 
   useEffect(() => {
@@ -126,6 +130,9 @@ export default function Products() {
         category_id: product.category_id || '',
         is_active: product.is_active,
         is_service: (product as any).is_service || false,
+        purchase_unit: product.purchase_unit || '',
+        base_unit: product.base_unit || '',
+        conversion_rate: product.conversion_rate?.toString() || '1',
       });
     } else {
       setEditingProduct(null);
@@ -137,6 +144,9 @@ export default function Products() {
         category_id: categories[0]?.id || '',
         is_active: true,
         is_service: false,
+        purchase_unit: '',
+        base_unit: '',
+        conversion_rate: '1',
       });
     }
     setShowDialog(true);
@@ -157,11 +167,14 @@ export default function Products() {
         category_id: formData.category_id || null,
         is_active: formData.is_active,
         is_service: formData.is_service,
+        purchase_unit: formData.purchase_unit || null,
+        base_unit: formData.base_unit || null,
+        conversion_rate: parseFloat(formData.conversion_rate) || 1,
         outlet_id: selectedOutlet?.id,
       };
 
       if (editingProduct) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('products')
           .update(productData)
           .eq('id', editingProduct.id);
@@ -169,7 +182,7 @@ export default function Products() {
         if (error) throw error;
         toast({ title: 'Sukses', description: 'Produk berhasil diupdate' });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('products')
           .insert(productData);
 
@@ -206,6 +219,7 @@ export default function Products() {
         ingredient_product_id: '',
         quantity: '1',
         unit: 'pcs',
+        yield_percentage: '100',
         notes: '',
       },
     ]);
@@ -301,7 +315,7 @@ export default function Products() {
           .order('name'),
         (supabase as any)
           .from('product_bom_items')
-          .select('id, ingredient_product_id, quantity, unit, notes')
+          .select('id, ingredient_product_id, quantity, unit, notes, yield_percentage')
           .eq('product_id', product.id)
           .order('created_at', { ascending: true }),
       ]);
@@ -320,6 +334,7 @@ export default function Products() {
         ingredient_product_id: row.ingredient_product_id,
         quantity: String(row.quantity ?? '1'),
         unit: row.unit || 'pcs',
+        yield_percentage: String(row.yield_percentage ?? '100'),
         notes: row.notes || '',
       }));
 
@@ -331,6 +346,7 @@ export default function Products() {
                 ingredient_product_id: '',
                 quantity: '1',
                 unit: 'pcs',
+                yield_percentage: '100',
                 notes: '',
               },
             ]
@@ -362,6 +378,7 @@ export default function Products() {
         ingredient_product_id: row.ingredient_product_id,
         quantity: parseFloat(row.quantity),
         unit: row.unit || 'pcs',
+        yield_percentage: parseFloat(row.yield_percentage) || 100,
         notes: row.notes || null,
       }));
 
@@ -389,6 +406,7 @@ export default function Products() {
           ingredient_product_id: row.ingredient_product_id,
           quantity: row.quantity,
           unit: row.unit,
+          yield_percentage: row.yield_percentage,
           notes: row.notes,
         }));
 
@@ -514,6 +532,11 @@ export default function Products() {
                             <p className="font-medium">{product.name}</p>
                             {product.description && (
                               <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
+                            )}
+                            {product.purchase_unit && product.base_unit && (
+                              <p className="text-xs text-blue-600">
+                                1 {product.purchase_unit} = {product.conversion_rate} {product.base_unit}
+                              </p>
                             )}
                           </div>
                         </TableCell>
@@ -665,6 +688,46 @@ export default function Products() {
                   <p className="text-xs text-muted-foreground">Cost of Goods Sold</p>
                 </div>
               </div>
+              
+              {!formData.is_service && (
+                <div className="grid grid-cols-3 gap-4 bg-muted/30 p-3 rounded-lg border border-border">
+                  <div className="col-span-3">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                       Unit of Measurement (UoM) / Konversi Satuan
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">Atur ini jika bahan dibeli dalam satuan besar tapi dicatat gudang dalam satuan kecil.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase_unit">Satuan Beli (PO)</Label>
+                    <Input
+                      id="purchase_unit"
+                      value={formData.purchase_unit}
+                      onChange={(e) => setFormData({ ...formData, purchase_unit: e.target.value })}
+                      placeholder="Dus, Box"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="conversion_rate">Nilai Konversi</Label>
+                    <Input
+                      id="conversion_rate"
+                      type="number"
+                      value={formData.conversion_rate}
+                      onChange={(e) => setFormData({ ...formData, conversion_rate: e.target.value })}
+                      placeholder="12"
+                      min="1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="base_unit">Satuan Dasar (Stock)</Label>
+                    <Input
+                      id="base_unit"
+                      value={formData.base_unit}
+                      onChange={(e) => setFormData({ ...formData, base_unit: e.target.value })}
+                      placeholder="Liter, Kg"
+                    />
+                  </div>
+                </div>
+              )}
 
               {formData.price && (
                 <div className="bg-muted/50 rounded-lg p-3">
@@ -728,7 +791,7 @@ export default function Products() {
 
                 {bomItems.map((row, idx) => (
                   <div key={row.id || idx} className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg border">
-                    <div className="col-span-12 md:col-span-5 space-y-1">
+                    <div className="col-span-12 md:col-span-3 space-y-1">
                       <Label>Bahan</Label>
                       <Select
                         value={row.ingredient_product_id}
@@ -758,12 +821,24 @@ export default function Products() {
                       />
                     </div>
 
-                    <div className="col-span-6 md:col-span-2 space-y-1">
+                    <div className="col-span-4 md:col-span-2 space-y-1">
                       <Label>Satuan</Label>
                       <Input
                         value={row.unit}
                         onChange={(e) => updateBomRow(idx, { unit: e.target.value })}
                         placeholder="pcs"
+                      />
+                    </div>
+
+                    <div className="col-span-4 md:col-span-2 space-y-1">
+                      <Label>Yield (%)</Label>
+                      <Input
+                        type="number"
+                        value={row.yield_percentage}
+                        onChange={(e) => updateBomRow(idx, { yield_percentage: e.target.value })}
+                        placeholder="100"
+                        min="1"
+                        max="100"
                       />
                     </div>
 

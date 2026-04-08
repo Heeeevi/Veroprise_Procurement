@@ -16,23 +16,73 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import HelpGuide from '@/components/HelpGuide';
 import StockNotifications from '@/components/StockNotifications';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useState } from 'react';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
-const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
-  { icon: ShoppingCart, label: 'POS / Kasir', href: '/pos', roles: ['super_admin', 'owner', 'manager', 'staff'] },
-  // BOOKING DISABLED
-  // { icon: Calendar, label: 'Booking', href: '/bookings', roles: ['owner', 'manager', 'staff'] },
-  { icon: Tag, label: 'Produk & Layanan', href: '/products', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'manager'] },
-  { icon: Warehouse, label: 'Gudang', href: '/warehouse', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff'] },
-  { icon: Receipt, label: 'Transaksi', href: '/transactions', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
-  { icon: Users, label: 'HR & Payroll', href: '/hr', roles: ['super_admin', 'owner', 'manager'] },
-  { icon: BarChart3, label: 'Laporan', href: '/reports', roles: ['super_admin', 'owner', 'pengadaan', 'manager', 'investor'] },
-  { icon: Users, label: 'Pengguna', href: '/users', roles: ['super_admin', 'owner'] },
-  { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['super_admin', 'owner', 'pengadaan', 'gudang', 'peracikan_bumbu', 'unit_produksi', 'manager', 'staff', 'investor'] },
+interface MenuItemChild {
+  label: string;
+  href: string;
+  roles?: string[];
+}
+
+interface MenuItem {
+  icon: any;
+  label: string;
+  href?: string;
+  roles: string[];
+  children?: MenuItemChild[];
+}
+
+const menuItems: MenuItem[] = [
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', roles: ['super_admin', 'owner', 'manager', 'pengadaan', 'gudang', 'peracikan_bumbu', 'staff'] },
+  
+  {
+    icon: ShoppingCart, label: 'Buying', roles: ['super_admin', 'owner', 'manager', 'pengadaan'],
+    children: [
+      { label: 'Supplier Management', href: '/buying/suppliers' },
+      { label: 'Purchase Orders', href: '/buying/purchase-orders' },
+      { label: 'Stock Management (Purchase Receive)', href: '/buying/inbound' },
+    ]
+  },
+
+  {
+    icon: Receipt, label: 'Selling', roles: ['super_admin', 'owner', 'manager', 'gudang', 'peracikan_bumbu'],
+    children: [
+      { label: 'Sales Orders', href: '/selling/sales-orders', roles: ['super_admin', 'owner', 'manager', 'peracikan_bumbu'] }, // Staff Premixture
+      { label: 'Invoice (Outbound)', href: '/selling/invoices', roles: ['super_admin', 'owner', 'manager', 'gudang'] }, // Staff Warehouse
+      { label: 'Payment Entry', href: '/selling/payments', roles: ['super_admin', 'owner', 'manager'] },
+      { label: 'Delivery & Route', href: '/selling/delivery', roles: ['super_admin', 'owner', 'manager', 'gudang'] },
+    ]
+  },
+
+  {
+    icon: Warehouse, label: 'Stock', roles: ['super_admin', 'owner', 'manager', 'gudang'],
+    children: [
+      { label: 'Inventory Tracking (Stock Opname)', href: '/stock/tracking' },
+      { label: 'Item Management', href: '/stock/items' },
+      { label: 'Stock Transactions', href: '/stock/transactions' },
+      { label: 'Stock Reconcilliation', href: '/stock/reconciliation' },
+    ]
+  },
+
+  {
+    icon: Tag, label: 'Manufacturing', roles: ['super_admin', 'owner', 'manager', 'gudang', 'peracikan_bumbu'],
+    children: [
+      { label: 'Job Cards', href: '/manufacturing/job-cards', roles: ['super_admin', 'owner', 'manager', 'peracikan_bumbu'] },
+      { label: 'Bill of Materials', href: '/manufacturing/bom', roles: ['super_admin', 'owner', 'manager', 'peracikan_bumbu'] },
+      { label: 'Work Orders', href: '/manufacturing/work-orders', roles: ['super_admin', 'owner', 'manager', 'peracikan_bumbu'] },
+      { label: 'Production Planning', href: '/manufacturing/planning', roles: ['super_admin', 'owner', 'manager', 'peracikan_bumbu'] },
+      { label: 'Inventory Management', href: '/manufacturing/inventory', roles: ['super_admin', 'owner', 'manager', 'gudang'] },
+      { label: 'Disassembly (Aqiqah)', href: '/manufacturing/disassembly', roles: ['super_admin', 'owner', 'manager', 'gudang', 'peracikan_bumbu'] },
+    ]
+  },
+
+  { icon: Users, label: 'Users & Permissions', href: '/users', roles: ['super_admin', 'owner', 'manager'] },
+  { icon: Settings, label: 'System Settings', href: '/settings', roles: ['super_admin', 'owner', 'manager'] },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -57,40 +107,99 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const getRoleLabel = () => {
     switch (role) {
       case 'super_admin': return 'Super Admin';
-      case 'pengadaan': return 'Pengadaan';
-      case 'gudang': return 'Gudang';
-      case 'peracikan_bumbu': return 'Peracikan Bumbu';
-      case 'unit_produksi': return 'Unit Produksi';
-      case 'owner': return 'Owner';
+      case 'owner': return 'Super Admin';
       case 'manager': return 'Manager';
+      case 'pengadaan': return 'Staff Purchasing';
+      case 'gudang': return 'Staff Warehouse';
+      case 'peracikan_bumbu': return 'Staff Premixture';
+      case 'unit_produksi': return 'Unit Produksi';
       case 'staff': return 'Staff';
       case 'investor': return 'Investor';
       default: return 'No Role';
     }
   };
 
-  const NavLinks = () => (
-    <nav className="space-y-1">
-      {visibleMenus.map((item) => {
-        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
-        return (
-          <Link
-            key={item.href}
-            to={item.href}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent"
-            )}
-          >
-            <item.icon className="h-5 w-5" />
-            <span className="font-medium">{item.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const NavLinks = () => {
+    // Determine active parent based on location
+    const [openP, setOpenP] = useState<string | null>(() => {
+      const parent = visibleMenus.find(v => v.children?.some(c => location.pathname.startsWith(c.href || '')));
+      return parent ? parent.label : null;
+    });
+
+    return (
+      <nav className="space-y-1">
+        {visibleMenus.map((item) => {
+          if (item.children) {
+            const isParentActive = item.children.some(c => location.pathname.startsWith(c.href || ''));
+            const isOpen = openP === item.label || isParentActive;
+
+            // Filter visible children based on role (some children have specific override roles)
+            const visibleChildren = item.children.filter(child => !child.roles || (role && child.roles.includes(role)));
+
+            if (visibleChildren.length === 0) return null;
+
+            return (
+              <Collapsible
+                key={item.label}
+                open={isOpen}
+                onOpenChange={(v) => v ? setOpenP(item.label) : setOpenP(null)}
+                className="w-full"
+              >
+                <CollapsibleTrigger className={cn(
+                  "flex items-center justify-between w-full px-4 py-3 rounded-lg transition-colors group",
+                  isOpen ? "bg-sidebar-accent/50 text-sidebar-foreground font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}>
+                  <div className="flex items-center gap-3">
+                    <item.icon className={cn("h-5 w-5", isOpen ? "text-primary" : "")} />
+                    <span>{item.label}</span>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="px-4 py-1 space-y-1 mt-1">
+                  <div className="border-l border-sidebar-border ml-3 pl-3 space-y-1">
+                    {visibleChildren.map((child) => {
+                      const isActive = location.pathname === child.href || location.pathname.startsWith(`${child.href}/`);
+                      return (
+                        <Link
+                          key={child.href}
+                          to={child.href || '#'}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors",
+                            isActive
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                          )}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          }
+
+          const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.href || item.label}
+              to={item.href || '#'}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              <span className="font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex">

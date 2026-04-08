@@ -154,7 +154,7 @@ export default function Inventory() {
       // Outlet-scoped inventory: each branch sees only its own stock.
       const { data } = await (supabase as any)
         .from('inventory')
-        .select('id, product_id, quantity, min_quantity, unit, is_active, product:products(name, cost, is_active, is_service)')
+        .select('id, product_id, quantity, min_quantity, unit, is_active, product:products(name, cost, is_active, is_service, base_unit)')
         .eq('outlet_id', selectedOutlet.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -164,7 +164,7 @@ export default function Inventory() {
         .map((row: any) => ({
           id: row.product_id,
           name: row.product.name,
-          unit: row.unit || 'pcs',
+          unit: row.product.base_unit || row.unit || 'pcs',
           min_stock: row.min_quantity || 0,
           current_stock: row.quantity || 0,
           cost_per_unit: row.product.cost || 0,
@@ -184,7 +184,7 @@ export default function Inventory() {
         if (centralWarehouse?.id) {
           const { data: warehouseRows } = await (supabase as any)
             .from('warehouse_inventory')
-            .select('product_id, quantity, min_stock, cost_per_unit, product:products(name, is_active, is_service)')
+            .select('product_id, quantity, min_stock, cost_per_unit, product:products(name, is_active, is_service, base_unit)')
             .eq('warehouse_id', centralWarehouse.id);
 
           const fallbackItems = (warehouseRows || [])
@@ -192,7 +192,7 @@ export default function Inventory() {
             .map((row: any) => ({
               id: row.product_id,
               name: row.product.name,
-              unit: 'pcs',
+              unit: row.product.base_unit || 'pcs',
               min_stock: row.min_stock || 0,
               current_stock: row.quantity || 0,
               cost_per_unit: row.cost_per_unit || 0,

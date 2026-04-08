@@ -25,12 +25,16 @@ interface POItem {
     subtotal: number;
     product: {
         name: string;
+        purchase_unit?: string;
+        base_unit?: string;
+        conversion_rate?: number;
     };
 }
 
 interface PurchaseOrder {
     id: string;
     po_number: string;
+    warehouse_id: string;
     status: 'draft' | 'submitted' | 'approved' | 'received' | 'cancelled';
     total_amount: number;
     supplier_name: string | null;
@@ -79,7 +83,7 @@ export default function PurchaseOrderDetail() {
     const fetchPOItems = async () => {
         const { data } = await supabase
             .from('purchase_order_items')
-            .select('*, product:products(name)')
+            .select('*, product:products(name, purchase_unit, base_unit, conversion_rate)')
             .eq('purchase_order_id', id);
         setItems(data || []);
     };
@@ -102,7 +106,7 @@ export default function PurchaseOrderDetail() {
             const cost = parseFloat(newItemCost);
             const subtotal = qty * cost;
 
-            const { error } = await supabase.from('purchase_order_items').insert({
+            const { error } = await (supabase as any).from('purchase_order_items').insert({
                 purchase_order_id: id,
                 product_id: newItemId,
                 quantity: qty,
@@ -127,17 +131,17 @@ export default function PurchaseOrderDetail() {
     };
 
     const handleDeleteItem = async (itemId: string) => {
-        await supabase.from('purchase_order_items').delete().eq('id', itemId);
+        await (supabase as any).from('purchase_order_items').delete().eq('id', itemId);
         await updatePOTotal();
         fetchPOItems();
     };
 
     const updatePOTotal = async () => {
         // Recalculate total from items
-        const { data } = await supabase.from('purchase_order_items').select('subtotal').eq('purchase_order_id', id);
-        const total = data?.reduce((sum, item) => sum + item.subtotal, 0) || 0;
+        const { data } = await (supabase as any).from('purchase_order_items').select('subtotal').eq('purchase_order_id', id);
+        const total = data?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0;
 
-        await supabase.from('purchase_orders').update({ total_amount: total }).eq('id', id);
+        await (supabase as any).from('purchase_orders').update({ total_amount: total }).eq('id', id);
         fetchPODetails();
     };
 
@@ -148,7 +152,7 @@ export default function PurchaseOrderDetail() {
         }
 
         try {
-            const { error } = await supabase
+            const { error } = await (supabase as any)
                 .from('purchase_orders')
                 .update({ status: newStatus })
                 .eq('id', id);
@@ -176,7 +180,7 @@ export default function PurchaseOrderDetail() {
                 const qty = Number(item.quantity) || 0;
                 if (qty <= 0) continue;
 
-                const { error: receivedQuantityError } = await supabase
+                const { error: receivedQuantityError } = await (supabase as any)
                     .from('purchase_order_items')
                     .update({ received_quantity: qty })
                     .eq('id', item.id);
@@ -185,7 +189,7 @@ export default function PurchaseOrderDetail() {
             }
 
             // 1. Update PO Status
-            await supabase.from('purchase_orders').update({
+            await (supabase as any).from('purchase_orders').update({
                 status: 'received',
                 received_by: currentUserId,
                 received_date: new Date().toISOString(),
@@ -197,21 +201,48 @@ export default function PurchaseOrderDetail() {
                 const qty = Number(item.quantity) || 0;
                 if (qty <= 0) continue;
 
+                // Hitung Konversi UoM untuk stok Gudang
+                const conversionRate = item.product?.conversion_rate || 1;
+                const baseQty = qty * conversionRate;
+                const baseUnitLabel = item.product?.base_unit ? ` ${item.product.base_unit}` : '';
+                const purchaseUnitLabel = item.product?.purchase_unit || 'Item';
+
                 const { error: movementError } = await (supabase as any)
                     .from('warehouse_stock_movements')
                     .insert({
                         warehouse_id: warehouseId,
                         product_id: item.product_id,
                         movement_type: 'stock_in',
-                        quantity: qty,
+                        quantity: baseQty, // Audit trail mencatat base_unit
                         reference_table: 'purchase_orders',
                         reference_id: id,
-                        note: `Penerimaan dari PO #${po.po_number || id?.substring(0, 8)}`,
+                        note: `Penerimaan dari PO #${po.po_number || id?.substring(0, 8)} (${qty} ${purchaseUnitLabel} -> ${baseQty}${baseUnitLabel})`,
                         performed_by: currentUserId,
                         movement_date: new Date(`${receiveDate}T00:00:00`).toISOString(),
                     });
 
                 if (movementError) throw movementError;
+
+                // 2.5: Because the database trigger on `purchase_order_items` only adds the raw PO quantity `qty`, 
+                // we must manually ADD the remaining `baseQty - qty` to the `warehouse_inventory` if `baseQty != qty`,
+                // or if no trigger exists, we should just update `warehouse_inventory` directly.
+                // Assuming trigger already added `qty`, we add the missing base amounts:
+                if (baseQty !== qty) {
+                     const missingBaseQty = baseQty - qty;
+                     const { data: currentInv } = await (supabase as any)
+                        .from('warehouse_inventory')
+                        .select('id, quantity')
+                        .eq('warehouse_id', warehouseId)
+                        .eq('product_id', item.product_id)
+                        .maybeSingle();
+
+                     if (currentInv) {
+                        await (supabase as any)
+                           .from('warehouse_inventory')
+                           .update({ quantity: Number(currentInv.quantity) + missingBaseQty })
+                           .eq('id', currentInv.id);
+                     }
+                }
             }
 
             // 3. Create Expense Record automatically
@@ -220,7 +251,7 @@ export default function PurchaseOrderDetail() {
             const expenseAmount = poTotalAmount > 0 ? poTotalAmount : itemTotalAmount;
 
             if (expenseAmount > 0 && selectedOutlet?.id) {
-                await supabase.from('expenses').insert({
+                await (supabase as any).from('expenses').insert({
                     outlet_id: selectedOutlet?.id,
                     created_by: currentUserId,
                     category: 'supplies',
@@ -303,8 +334,17 @@ export default function PurchaseOrderDetail() {
                                 ) : (
                                     items.map(item => (
                                         <TableRow key={item.id}>
-                                            <TableCell>{item.product?.name}</TableCell>
-                                            <TableCell className="text-right">{item.quantity}</TableCell>
+                                            <TableCell>
+                                                {item.product?.name}
+                                                {item.product?.purchase_unit && item.product?.base_unit && item.product?.conversion_rate !== 1 && (
+                                                    <p className="text-xs text-blue-600 block mt-1">
+                                                        UoM: 1 {item.product.purchase_unit} = {item.product.conversion_rate} {item.product.base_unit}
+                                                    </p>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {item.quantity} {item.product?.purchase_unit}
+                                            </TableCell>
                                             <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
                                             <TableCell className="text-right">
@@ -386,7 +426,12 @@ export default function PurchaseOrderDetail() {
                                     {items.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>{item.product?.name}</TableCell>
-                                            <TableCell className="text-right">{item.quantity}</TableCell>
+                                            <TableCell className="text-right">
+                                                {item.quantity} {item.product?.purchase_unit || ''} 
+                                                <span className="text-xs text-muted-foreground block">
+                                                    =&gt; {item.quantity * (item.product?.conversion_rate || 1)} {item.product?.base_unit || ''}
+                                                </span>
+                                            </TableCell>
                                             <TableCell>
                                                 <Input
                                                     type="date"

@@ -119,6 +119,17 @@ const helpContentMap: Record<string, HelpContent> = {
             { title: 'Assign Outlet', desc: 'Tentukan user bisa akses outlet mana' }
         ],
         tips: ['Owner = akses penuh', 'Manager = kelola operasional', 'Staff = kasir saja', 'Investor = lihat laporan saja']
+    },
+    '/manufacturing': {
+        title: '🏭 Manufaktur & Produksi',
+        description: 'Sistem komprehensif aliran produksi makanan dari peracikan hingga jadi.',
+        steps: [
+            { title: 'Production Planning', desc: 'Petakan jadwal masak berdasarkan order yang masuk' },
+            { title: 'Bill of Materials (BoM)', desc: 'Dasar formulasi resep dan target persentase (Yield)' },
+            { title: 'Job Cards', desc: 'Panduan eksekusi dapur harian (Kitting & Mutasi Stok)' },
+            { title: 'Disassembly', desc: 'Pemotongan hewan utuh (Kambing/Sapi) ke satuan gram daging/tulang' }
+        ],
+        tips: ['Sistem otomatis menghitung pengurangan/penambahan stok saat Job Cards "Selesai"', 'Gunakan Disassembly khusus untuk memecah material utuh jadi komponen']
     }
 };
 
@@ -200,10 +211,13 @@ export default function HelpGuide() {
                             )}
 
                             {/* Contact */}
-                            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-lg">
-                                <p className="text-sm text-center text-muted-foreground">
-                                    Butuh bantuan lebih? Hubungi tim support kami.
-                                </p>
+                            <div className="pt-2">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all"
+                                    onClick={() => window.open('https://wa.me/6282338618276?text=' + encodeURIComponent('Halo Tim Support, saya butuh bantuan mengenai penggunaan sistem Veroprise.'), '_blank')}
+                                >
+                                    Butuh Bantuan Lebih? Hubungi Tim Support Kami
+                                </Button>
                             </div>
                         </div>
                     </ScrollArea>

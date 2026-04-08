@@ -61,6 +61,9 @@ export interface Product {
   cost_price: number;
   image_url: string | null;
   is_active: boolean;
+  purchase_unit?: string;
+  base_unit?: string;
+  conversion_rate?: number;
   created_at: string;
   updated_at: string;
   category?: Category;

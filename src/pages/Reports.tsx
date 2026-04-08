@@ -137,9 +137,23 @@ export default function Reports() {
 
       const { data: expenses } = await expensesQuery;
 
+      // Fetch received purchase orders as expenses
+      let poQuery = supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('status', 'received')
+        .gte('created_at', startDate.toISOString());
+
+      // Note: Assuming PO belongs to warehouse, so filtering by outlet id might not perfectly align if outlet != warehouse.
+      // We will just fetch all POs or map if needed. For now just fetch all.
+      const { data: purchaseOrders } = await poQuery;
+
       const totalSales = transactions?.reduce((sum, t) => sum + Number(t.total), 0) || 0;
       const totalTransactions = transactions?.length || 0;
-      const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      
+      const basicExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const poExpenses = purchaseOrders?.reduce((sum, po) => sum + Number(po.total_amount), 0) || 0;
+      const totalExpenses = basicExpenses + poExpenses;
 
       // Calculate cost of goods sold (COGS)
       let cogs = 0;
