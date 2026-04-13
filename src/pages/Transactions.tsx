@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useOutlet } from '@/hooks/useOutlet';
 import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Transactions() {
@@ -96,9 +98,17 @@ export default function Transactions() {
             <h1 className="font-display text-2xl font-semibold">Transaksi</h1>
             <p className="text-muted-foreground">Riwayat penjualan {selectedOutlet?.name}</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Total Penjualan</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalSales)}</p>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Total Penjualan</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalSales)}</p>
+            </div>
+            <Link to="/pos">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Sales Order
+              </Button>
+            </Link>
           </div>
         </div>
 
