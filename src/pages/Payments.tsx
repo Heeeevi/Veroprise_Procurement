@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreditCard, Plus, ArrowDownToLine } from 'lucide-react';
+import { CreditCard, Plus, ArrowDownToLine, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function Payments() {
   const [payments, setPayments] = useState([
@@ -13,6 +14,7 @@ export default function Payments() {
   ]);
   const [showDialog, setShowDialog] = useState(false);
   const [newPayment, setNewPayment] = useState({ client: '', amount: '', type: '' });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const handleEntry = () => {
     if (!newPayment.client || !newPayment.amount || !newPayment.type) return;
@@ -26,6 +28,21 @@ export default function Payments() {
     setShowDialog(false);
     setNewPayment({ client: '', amount: '', type: '' });
   };
+
+  const handleBulkDelete = () => {
+    if (!confirm(`Yakin ingin menghapus ${selectedIds.length} riwayat pembayaran terpilih?`)) return;
+    setPayments(payments.filter(p => !selectedIds.includes(p.id)));
+    setSelectedIds([]);
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds([...selectedIds, id]);
+    } else {
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    }
+  };
+
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
@@ -36,9 +53,16 @@ export default function Payments() {
             </h1>
             <p className="text-muted-foreground">Catat penerimaan pembayaran dari Klien</p>
           </div>
-          <Button onClick={() => setShowDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Terima Pembayaran
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <Button variant="destructive" onClick={handleBulkDelete}>
+                <Trash className="w-4 h-4 mr-2" /> Hapus {selectedIds.length} Terpilih
+              </Button>
+            )}
+            <Button onClick={() => setShowDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Terima Pembayaran
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -51,8 +75,14 @@ export default function Payments() {
                <div className="py-12 text-center text-muted-foreground">Belum ada riwayat pembayaran yang di-entry.</div>
              ) : (
                payments.map((pay) => (
-                 <div key={pay.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card">
+                 <div key={pay.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card gap-4">
                    <div className="flex items-start gap-4">
+                     <div className="pt-2">
+                       <Checkbox 
+                         checked={selectedIds.includes(pay.id)} 
+                         onCheckedChange={(c) => toggleSelect(pay.id, !!c)} 
+                       />
+                     </div>
                      <div className="p-2 bg-green-100 text-green-600 rounded-lg">
                        <ArrowDownToLine className="w-6 h-6" />
                      </div>

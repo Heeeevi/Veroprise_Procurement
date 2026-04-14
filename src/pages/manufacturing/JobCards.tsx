@@ -11,9 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, CheckCircle2, PlayCircle, Loader2, ArrowRightCircle } from 'lucide-react';
+import { Plus, CheckCircle2, PlayCircle, Loader2, ArrowRightCircle, Trash } from 'lucide-react';
 import { format } from 'date-fns';
-
 
 export default function JobCards() {
   const { toast } = useToast();
@@ -21,6 +20,8 @@ export default function JobCards() {
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [productsWithBom, setProductsWithBom] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Dialog State
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -64,8 +65,6 @@ export default function JobCards() {
         .from('products')
         .select('id, name')
         .eq('is_active', true);
-      // In reality, we should only fetch products that appear in `product_bom_items`
-      // For now, let's just fetch active products.
 
       // Fetch Warehouses
       const { data: whData } = await (supabase as any).from('warehouses').select('id, name');
@@ -122,7 +121,6 @@ export default function JobCards() {
 
       // 3. Insert WO Items based on BOM * Quantity * Yield Factor
       const itemsPayload = boms.map((bom: any) => {
-        // Rumus: (BOM base qty * target WO qty) / (yield_percentage / 100)
         let yieldFactor = (bom.yield_percentage || 100) / 100;
         if (yieldFactor <= 0) yieldFactor = 1; // Safeguard
 
@@ -255,6 +253,45 @@ export default function JobCards() {
         });
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Yakin ingin menghapus ${selectedIds.length} Job Cards yang dipilih secara permanen? Data yang berkaitan juga akan ikut terhapus.`)) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('work_orders')
+        .delete()
+        .in('id', selectedIds);
+
+      if (error) throw error;
+      
+      toast({ title: 'Berhasil', description: `${selectedIds.length} Job Cards berhasil dihapus.` });
+      setSelectedIds([]);
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(workOrders.map(wo => wo.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'planned': return <Badge variant="secondary">Planned / Draft</Badge>;
@@ -275,12 +312,17 @@ export default function JobCards() {
             </h1>
             <p className="text-muted-foreground">Kelola produksi dapur & pantau WIP(Work In Progress)</p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Mulai Produksi
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeleting}>
+                <Trash className="w-4 h-4 mr-2" /> Hapus {selectedIds.length} Terpilih
+              </Button>
+            )}
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Mulai Produksi
+            </Button>
+          </div>
         </div>
-
-
 
         {loading ? (
           <div className="flex justify-center my-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
@@ -293,6 +335,12 @@ export default function JobCards() {
                <Table>
                  <TableHeader>
                    <TableRow>
+                     <TableHead className="w-12">
+                       <Checkbox 
+                         checked={selectedIds.length === workOrders.length && workOrders.length > 0} 
+                         onCheckedChange={(c) => toggleSelectAll(!!c)} 
+                       />
+                     </TableHead>
                      <TableHead>No. WO</TableHead>
                      <TableHead>Tgl Rencana</TableHead>
                      <TableHead>Produk Target</TableHead>
@@ -305,10 +353,16 @@ export default function JobCards() {
                  <TableBody>
                    {workOrders.length === 0 ? (
                       <TableRow>
-                         <TableCell colSpan={7} className="text-center py-6">Belum ada Job Card aktif</TableCell>
+                         <TableCell colSpan={8} className="text-center py-6">Belum ada Job Card aktif</TableCell>
                       </TableRow>
                    ) : workOrders.map(wo => (
                       <TableRow key={wo.id}>
+                         <TableCell>
+                           <Checkbox 
+                             checked={selectedIds.includes(wo.id)} 
+                             onCheckedChange={(c) => toggleSelect(wo.id, !!c)} 
+                           />
+                         </TableCell>
                          <TableCell className="font-mono text-xs">{wo.wo_number}</TableCell>
                          <TableCell>{format(new Date(wo.created_at), 'dd MMM yyyy')}</TableCell>
                          <TableCell className="font-medium">{wo.product?.name}</TableCell>
@@ -332,10 +386,10 @@ export default function JobCards() {
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Buat Work Order Baru</DialogTitle>
-              <DialogDescription>
-                 Sistem akan menjabarkan (explode) BOM dari produk target dan menghitung kitting bahan baku termasuk perhitungan Yield Factor.
-              </DialogDescription>
+               <DialogTitle>Buat Work Order Baru</DialogTitle>
+               <DialogDescription>
+                  Sistem akan menjabarkan (explode) BOM dari produk target dan menghitung kitting bahan baku termasuk perhitungan Yield Factor.
+               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-3">
               <div className="space-y-2">
@@ -363,13 +417,13 @@ export default function JobCards() {
                  </div>
               </div>
               <div className="space-y-2">
-                <Label>Notes</Label>
-                <Input value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Instruksi masak khusus..." />
+                 <Label>Notes</Label>
+                 <Input value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Instruksi masak khusus..." />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Batal</Button>
-              <Button onClick={handleCreateWO} disabled={isSubmitting}>{isSubmitting ? 'Loading...' : 'Generate Kitting List'}</Button>
+               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Batal</Button>
+               <Button onClick={handleCreateWO} disabled={isSubmitting}>{isSubmitting ? 'Loading...' : 'Generate Kitting List'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

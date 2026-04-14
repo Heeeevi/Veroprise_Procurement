@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, User, Mail, Shield } from 'lucide-react';
+import { Lock, User, Mail, Shield, Download, Database } from 'lucide-react';
 
 export default function Settings() {
   const { user, profile, role } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -68,6 +69,53 @@ export default function Settings() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBackupData = async () => {
+    setBackupLoading(true);
+    try {
+      const tables = [
+        'attendances', 'bookings', 'categories', 'daily_closings', 'employee_bonuses', 
+        'employees', 'expenses', 'outlets', 'pos_shifts', 'products', 'profiles',
+        'purchase_orders', 'sales_targets', 'shifts', 'stock_opnames', 'stock_transfers', 
+        'suppliers', 'transactions', 'transaction_items', 'user_outlets', 'warehouses'
+      ];
+      
+      const backupData: Record<string, any> = {};
+      
+      for (const table of tables) {
+        const { data, error } = await supabase.from(table).select('*');
+        if (!error) {
+          backupData[table] = data;
+        } else {
+          console.warn(`Error fetching ${table}:`, error);
+        }
+      }
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_erp_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Berhasil',
+        description: 'Data berhasil dibackup ke format JSON',
+      });
+    } catch (error) {
+      console.error('Error backup data:', error);
+      toast({
+        title: 'Gagal',
+        description: 'Terjadi kesalahan saat backup data',
+        variant: 'destructive',
+      });
+    } finally {
+      setBackupLoading(false);
     }
   };
 
@@ -228,6 +276,34 @@ export default function Settings() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Database Management Card */}
+        {role === 'owner' && (
+          <Card className="card-warm border-blue-200">
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Manajemen Data
+              </CardTitle>
+              <CardDescription>Menu khusus Owner untuk melakukan backup seluruh data ke format JSON</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Proses backup ini akan mengunduh semua data dari semua tabel di database Anda (termasuk Absensi, Pembelian, Inventory, dll) menjadi sebuah file JSON.
+                </p>
+                <Button 
+                  onClick={handleBackupData} 
+                  disabled={backupLoading}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {backupLoading ? 'Memproses Backup...' : 'Backup Semua Data (JSON)'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Security Info */}
         <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileText, Plus, FileCheck } from 'lucide-react';
+import { FileText, Plus, FileCheck, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([
@@ -13,6 +14,7 @@ export default function Invoices() {
   ]);
   const [showDialog, setShowDialog] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ client: '', amount: '' });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const handleCreate = () => {
     if (!newInvoice.client || !newInvoice.amount) return;
@@ -26,6 +28,21 @@ export default function Invoices() {
     setShowDialog(false);
     setNewInvoice({ client: '', amount: '' });
   };
+
+  const handleBulkDelete = () => {
+    if (!confirm(`Yakin ingin menghapus ${selectedIds.length} invoice terpilih?`)) return;
+    setInvoices(invoices.filter(i => !selectedIds.includes(i.id)));
+    setSelectedIds([]);
+  };
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds([...selectedIds, id]);
+    } else {
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    }
+  };
+
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
@@ -36,9 +53,16 @@ export default function Invoices() {
             </h1>
             <p className="text-muted-foreground">Kelola penagihan pembayaran ke klien catering</p>
           </div>
-          <Button onClick={() => setShowDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Buat Invoice Baru
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <Button variant="destructive" onClick={handleBulkDelete}>
+                <Trash className="w-4 h-4 mr-2" /> Hapus {selectedIds.length} Terpilih
+              </Button>
+            )}
+            <Button onClick={() => setShowDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Buat Invoice Baru
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -51,8 +75,14 @@ export default function Invoices() {
                <div className="py-12 text-center text-muted-foreground">Belum ada data Invoice terhutang.</div>
              ) : (
                invoices.map((inv) => (
-                 <div key={inv.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card">
+                 <div key={inv.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card gap-4">
                    <div className="flex items-start gap-4">
+                     <div className="pt-2">
+                       <Checkbox 
+                         checked={selectedIds.includes(inv.id)} 
+                         onCheckedChange={(c) => toggleSelect(inv.id, !!c)} 
+                       />
+                     </div>
                      <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
                        <FileCheck className="w-6 h-6" />
                      </div>
