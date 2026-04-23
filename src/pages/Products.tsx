@@ -11,11 +11,14 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { useOutlet } from '@/hooks/useOutlet';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Edit, Trash2, Package, Search, ListTree, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Search, ListTree, Settings, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import type { Product, Category } from '@/types/database';
+import BulkImportDialog from '@/components/BulkImportDialog';
+import type { BulkImportConfig, BulkColumnDef } from '@/components/BulkImportDialog';
 
 interface ProductOption {
   id: string;
@@ -53,6 +56,7 @@ export default function Products() {
   const [showBomDialog, setShowBomDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
@@ -458,10 +462,25 @@ export default function Products() {
               <Settings className="h-4 w-4 mr-2" />
               Atur Kategori
             </Button>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Produk
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Produk
+                  <ChevronDown className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleOpenDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Satuan
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBulkImport(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Bulk Import (XLSX)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -960,6 +979,60 @@ export default function Products() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Bulk Import Dialog */}
+        <BulkImportDialog
+          open={showBulkImport}
+          onOpenChange={setShowBulkImport}
+          config={{
+            entityName: 'Produk',
+            templateFileName: 'template_produk.xlsx',
+            columns: [
+              { key: 'name', label: 'Nama Produk', type: 'text', required: true, description: 'Nama produk (WAJIB)' },
+              { key: 'description', label: 'Deskripsi', type: 'text', required: false, description: 'Deskripsi singkat' },
+              { key: 'category', label: 'Kategori', type: 'text', required: false, description: categories.map(c => c.name).join(', ') || 'Nama kategori', options: categories.map(c => c.name) },
+              { key: 'price', label: 'Harga Jual', type: 'number', required: true, description: 'Harga jual (angka)' },
+              { key: 'cost_price', label: 'HPP', type: 'number', required: false, description: 'Harga pokok (angka)', defaultValue: 0 },
+              { key: 'is_active', label: 'Status Aktif', type: 'boolean', required: false, description: 'Ya / Tidak', defaultValue: 'Ya', options: ['Ya', 'Tidak'] },
+            ],
+            onImport: async (rows) => {
+              let success = 0;
+              let failed = 0;
+              const errors: string[] = [];
+
+              for (const row of rows) {
+                try {
+                  // Find category id by name
+                  let categoryId: string | null = null;
+                  if (row.category) {
+                    const cat = categories.find(c => c.name.toLowerCase() === String(row.category).toLowerCase());
+                    categoryId = cat?.id || null;
+                  }
+
+                  const { error } = await (supabase as any).from('products').insert({
+                    name: String(row.name),
+                    description: row.description ? String(row.description) : null,
+                    price: parseFloat(row.price) || 0,
+                    cost: parseFloat(row.cost_price) || 0,
+                    category_id: categoryId,
+                    is_active: String(row.is_active).toLowerCase() !== 'tidak',
+                    is_service: false,
+                    outlet_id: selectedOutlet?.id,
+                  });
+
+                  if (error) throw error;
+                  success++;
+                } catch (err: any) {
+                  failed++;
+                  errors.push(`Baris "${row.name}": ${err.message}`);
+                }
+              }
+
+              if (success > 0) fetchData();
+              return { success, failed, errors };
+            },
+          }}
+        />
       </div>
     </MainLayout>
   );

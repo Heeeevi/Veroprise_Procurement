@@ -13,8 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Search, AlertTriangle, Package, ArrowUpDown, Truck, FileText, Calendar, Trash2, AlertCircle, Edit } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Package, ArrowUpDown, Truck, FileText, Calendar, Trash2, AlertCircle, Edit, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import BulkImportDialog from '@/components/BulkImportDialog';
 
 interface InventoryItemWithStock {
   id: string;
@@ -51,6 +53,7 @@ export default function Inventory() {
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustType, setAdjustType] = useState<'add' | 'remove'>('add');
   const [adjustNotes, setAdjustNotes] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // New item form
   const [newItem, setNewItem] = useState({
@@ -482,10 +485,25 @@ export default function Inventory() {
                   Purchase Orders
                 </Button>
               </Link>
-              <Button onClick={() => setShowAddDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Item
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Item
+                    <ChevronDown className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowAddDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Satuan
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowBulkImport(true)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Bulk Import (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -897,6 +915,71 @@ export default function Inventory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={showBulkImport}
+        onOpenChange={setShowBulkImport}
+        config={{
+          entityName: 'Item Inventory',
+          templateFileName: 'template_inventory.xlsx',
+          columns: [
+            { key: 'name', label: 'Nama Item', type: 'text', required: true, description: 'Nama item (WAJIB)' },
+            { key: 'unit', label: 'Satuan', type: 'text', required: false, description: 'pcs, kg, liter, dll', defaultValue: 'pcs' },
+            { key: 'min_stock', label: 'Min. Stok', type: 'number', required: false, description: 'Batas minimum stok', defaultValue: 0 },
+            { key: 'cost_per_unit', label: 'Harga per Unit (HPP)', type: 'number', required: false, description: 'Harga pokok per unit', defaultValue: 0 },
+          ],
+          onImport: async (rows) => {
+            let success = 0;
+            let failed = 0;
+            const errors: string[] = [];
+
+            if (!selectedOutlet) {
+              return { success: 0, failed: rows.length, errors: ['Outlet belum dipilih'] };
+            }
+
+            for (const row of rows) {
+              try {
+                const { data: newProduct, error: productError } = await (supabase as any)
+                  .from('products')
+                  .insert({
+                    outlet_id: selectedOutlet.id,
+                    name: String(row.name),
+                    price: 0,
+                    min_stock: parseFloat(row.min_stock) || 0,
+                    cost: parseFloat(row.cost_per_unit) || 0,
+                    stock_quantity: 0,
+                    is_service: false,
+                  })
+                  .select('id')
+                  .single();
+
+                if (productError) throw productError;
+
+                const { error: inventoryError } = await (supabase as any)
+                  .from('inventory')
+                  .insert({
+                    outlet_id: selectedOutlet.id,
+                    product_id: newProduct.id,
+                    quantity: 0,
+                    min_quantity: parseFloat(row.min_stock) || 0,
+                    unit: row.unit || 'pcs',
+                    is_active: true,
+                  });
+
+                if (inventoryError) throw inventoryError;
+                success++;
+              } catch (err: any) {
+                failed++;
+                errors.push(`Item "${row.name}": ${err.message}`);
+              }
+            }
+
+            if (success > 0) fetchInventory();
+            return { success, failed, errors };
+          },
+        }}
+      />
     </MainLayout>
   );
 }

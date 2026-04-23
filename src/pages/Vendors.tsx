@@ -9,10 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search, Truck, ArrowLeft, Phone, Mail, MapPin } from 'lucide-react';
+import { Plus, Search, Truck, ArrowLeft, Phone, Mail, MapPin, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import PartnerVendorSection from '@/components/PartnerVendorSection';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import BulkImportDialog from '@/components/BulkImportDialog';
 
 interface Vendor {
     id: string;
@@ -31,6 +33,7 @@ export default function Vendors() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddDialog, setShowAddDialog] = useState(false);
+    const [showBulkImport, setShowBulkImport] = useState(false);
 
     // New vendor form
     const [newVendor, setNewVendor] = useState({
@@ -124,10 +127,25 @@ export default function Vendors() {
                         <p className="text-muted-foreground ml-10">Kelola supplier dan kontak vendor</p>
                     </div>
                     {(isOwner || isManager) && (
-                        <Button onClick={() => setShowAddDialog(true)}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Tambah Vendor
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Tambah Vendor
+                                    <ChevronDown className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setShowAddDialog(true)}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Tambah Satuan
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShowBulkImport(true)}>
+                                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                                    Bulk Import (XLSX)
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
                 </div>
 
@@ -280,6 +298,53 @@ export default function Vendors() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Bulk Import Dialog */}
+            <BulkImportDialog
+                open={showBulkImport}
+                onOpenChange={setShowBulkImport}
+                config={{
+                    entityName: 'Vendor',
+                    templateFileName: 'template_vendor.xlsx',
+                    columns: [
+                        { key: 'name', label: 'Nama Vendor', type: 'text', required: true, description: 'Nama vendor/supplier (WAJIB)' },
+                        { key: 'contact_person', label: 'Kontak Person', type: 'text', required: false, description: 'Nama orang kontak' },
+                        { key: 'email', label: 'Email', type: 'text', required: false, description: 'Email vendor' },
+                        { key: 'phone', label: 'No. Telepon', type: 'text', required: false, description: '08xxx / 021xxx' },
+                        { key: 'address', label: 'Alamat', type: 'text', required: false, description: 'Alamat lengkap' },
+                        { key: 'notes', label: 'Catatan', type: 'text', required: false, description: 'Terms pembayaran, jadwal kirim, dll' },
+                    ],
+                    onImport: async (rows) => {
+                        let success = 0;
+                        let failed = 0;
+                        const errors: string[] = [];
+
+                        for (const row of rows) {
+                            try {
+                                const code = 'SUP-' + Date.now().toString().slice(-6) + Math.floor(Math.random() * 100);
+                                const { error } = await (supabase as any).from('suppliers').insert({
+                                    code: code,
+                                    name: String(row.name),
+                                    contact_person: row.contact_person ? String(row.contact_person) : null,
+                                    email: row.email ? String(row.email) : null,
+                                    phone: row.phone ? String(row.phone) : '',
+                                    address: row.address ? String(row.address) : null,
+                                    notes: row.notes ? String(row.notes) : null,
+                                });
+
+                                if (error) throw error;
+                                success++;
+                            } catch (err: any) {
+                                failed++;
+                                errors.push(`Vendor "${row.name}": ${err.message}`);
+                            }
+                        }
+
+                        if (success > 0) fetchVendors();
+                        return { success, failed, errors };
+                    },
+                }}
+            />
         </MainLayout>
     );
 }
