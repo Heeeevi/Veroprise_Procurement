@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from '@/hooks/use-toast';
 import { useOutlet } from '@/hooks/useOutlet';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Edit, Trash2, Package, Search, ListTree, Settings, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Search, ListTree, Settings, FileSpreadsheet, ChevronDown, Loader2 } from 'lucide-react';
 import type { Product, Category } from '@/types/database';
 import BulkImportDialog from '@/components/BulkImportDialog';
 import type { BulkImportConfig, BulkColumnDef } from '@/components/BulkImportDialog';
@@ -59,6 +59,9 @@ export default function Products() {
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState<Record<string, any>>({});
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
@@ -191,6 +194,68 @@ export default function Products() {
       console.error('Error deleting products:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
+  };
+
+  const handleOpenBulkEdit = () => {
+    const initialData: Record<string, any> = {};
+    selectedProductIds.forEach(id => {
+      const product = products.find(p => p.id === id);
+      if (product) {
+        initialData[id] = {
+          sku: (product as any).sku || '',
+          name: product.name || '',
+          base_unit: product.base_unit || '',
+          category_id: product.category_id || 'unassigned',
+          is_active: product.is_active ?? true,
+        };
+      }
+    });
+    setBulkEditData(initialData);
+    setShowBulkEditDialog(true);
+  };
+
+  const handleSaveBulkEdit = async () => {
+    setIsBulkSaving(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of selectedProductIds) {
+      const data = bulkEditData[id];
+      if (!data) continue;
+
+      try {
+        const updateData = {
+          sku: data.sku || null,
+          name: data.name,
+          base_unit: data.base_unit || null,
+          category_id: data.category_id === 'unassigned' ? null : data.category_id,
+          is_active: data.is_active,
+        };
+
+        const { error } = await (supabase as any)
+          .from('products')
+          .update(updateData)
+          .eq('id', id);
+
+        if (error) throw error;
+        successCount++;
+      } catch (err) {
+        console.error('Bulk update error for id', id, err);
+        failCount++;
+      }
+    }
+
+    setIsBulkSaving(false);
+    setShowBulkEditDialog(false);
+    
+    if (failCount > 0) {
+      toast({ title: 'Selesai dengan Error', description: `${successCount} berhasil, ${failCount} gagal diupdate`, variant: 'destructive' });
+    } else {
+      toast({ title: 'Sukses', description: `${successCount} item berhasil diupdate` });
+    }
+    
+    setSelectedProductIds([]);
+    fetchData();
   };
 
   const handleSave = async () => {
@@ -563,6 +628,10 @@ export default function Products() {
                   <span className="text-sm text-muted-foreground mr-2">
                     {selectedProductIds.length} item dipilih
                   </span>
+                  <Button variant="outline" size="sm" onClick={handleOpenBulkEdit}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Pilihan
+                  </Button>
                   <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Hapus Pilihan
@@ -1034,6 +1103,96 @@ export default function Products() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>Tutup</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Edit Dialog */}
+        <Dialog open={showBulkEditDialog} onOpenChange={setShowBulkEditDialog}>
+          <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="font-display">Edit Masal ({selectedProductIds.length} Produk)</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto py-4 border-y">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead>Kode Bahan</TableHead>
+                    <TableHead>Nama *</TableHead>
+                    <TableHead>Satuan *</TableHead>
+                    <TableHead>Kategori</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedProductIds.map(id => {
+                    const data = bulkEditData[id];
+                    if (!data) return null;
+                    return (
+                      <TableRow key={id}>
+                        <TableCell className="p-1">
+                          <Input
+                            value={data.sku}
+                            onChange={(e) => setBulkEditData(prev => ({ ...prev, [id]: { ...prev[id], sku: e.target.value } }))}
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={data.name}
+                            onChange={(e) => setBulkEditData(prev => ({ ...prev, [id]: { ...prev[id], name: e.target.value } }))}
+                            className="h-8 min-w-[150px]"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={data.base_unit}
+                            onChange={(e) => setBulkEditData(prev => ({ ...prev, [id]: { ...prev[id], base_unit: e.target.value } }))}
+                            className="h-8 w-24"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Select
+                            value={data.category_id}
+                            onValueChange={(v) => setBulkEditData(prev => ({ ...prev, [id]: { ...prev[id], category_id: v } }))}
+                          >
+                            <SelectTrigger className="h-8 border-transparent hover:border-border">
+                              <SelectValue placeholder="Kategori" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">- Tanpa Kategori -</SelectItem>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="p-1 text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={data.is_active}
+                              onCheckedChange={(checked) => setBulkEditData(prev => ({ ...prev, [id]: { ...prev[id], is_active: checked } }))}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBulkEditDialog(false)}>Batal</Button>
+              <Button onClick={handleSaveBulkEdit} disabled={isBulkSaving}>
+                {isBulkSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  'Simpan Perubahan'
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -213,9 +213,10 @@ export default function BulkImportDialog({
     ws['!cols'] = colWidths;
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, config.entityName);
+    const safeSheetName = config.entityName.replace(/[\\/?*[\]]/g, '').substring(0, 31) || 'Template';
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
 
-    const fName = config.templateFileName || `template_${config.entityName.toLowerCase().replace(/\s+/g, '_')}.xlsx`;
+    const fName = config.templateFileName || `template_${config.entityName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.xlsx`;
     XLSX.writeFile(wb, fName);
 
     toast({ title: 'Template diunduh', description: `File "${fName}" berhasil didownload` });
