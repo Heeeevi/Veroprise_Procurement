@@ -55,6 +55,7 @@ export interface Category {
 export interface Product {
   id: string;
   category_id: string | null;
+  sku: string | null;
   name: string;
   description: string | null;
   price: number;

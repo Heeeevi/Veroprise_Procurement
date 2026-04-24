@@ -19,6 +19,7 @@ import { Plus, Edit, Trash2, Package, Search, ListTree, Settings, FileSpreadshee
 import type { Product, Category } from '@/types/database';
 import BulkImportDialog from '@/components/BulkImportDialog';
 import type { BulkImportConfig, BulkColumnDef } from '@/components/BulkImportDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ProductOption {
   id: string;
@@ -49,6 +50,7 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   // Dialog states
   const [showDialog, setShowDialog] = useState(false);
@@ -67,6 +69,7 @@ export default function Products() {
   const [ingredientOptions, setIngredientOptions] = useState<ProductOption[]>([]);
   const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
+    sku: '',
     name: '',
     description: '',
     price: '',
@@ -127,6 +130,7 @@ export default function Products() {
     if (product) {
       setEditingProduct(product);
       setFormData({
+        sku: (product as any).sku || '',
         name: product.name,
         description: product.description || '',
         price: product.price.toString(),
@@ -141,29 +145,63 @@ export default function Products() {
     } else {
       setEditingProduct(null);
       setFormData({
+        sku: '',
         name: '',
         description: '',
-        price: '',
+        price: '0',
         cost_price: '0',
         category_id: categories[0]?.id || '',
         is_active: true,
         is_service: false,
         purchase_unit: '',
-        base_unit: '',
+        base_unit: 'pcs',
         conversion_rate: '1',
       });
     }
     setShowDialog(true);
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProductIds(filteredProducts.map(p => p.id));
+    } else {
+      setSelectedProductIds([]);
+    }
+  };
+
+  const handleSelectProduct = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProductIds(prev => [...prev, id]);
+    } else {
+      setSelectedProductIds(prev => prev.filter(productId => productId !== id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedProductIds.length) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedProductIds.length} produk/item yang dipilih?`)) return;
+
+    try {
+      const { error } = await supabase.from('products').delete().in('id', selectedProductIds);
+      if (error) throw error;
+      toast({ title: 'Sukses', description: `${selectedProductIds.length} produk berhasil dihapus` });
+      setSelectedProductIds([]);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error deleting products:', error);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleSave = async () => {
-    if (!formData.name || !formData.price) {
-      toast({ title: 'Error', description: 'Nama dan harga harus diisi', variant: 'destructive' });
+    if (!formData.name) {
+      toast({ title: 'Error', description: 'Nama harus diisi', variant: 'destructive' });
       return;
     }
 
     try {
       const productData = {
+        sku: formData.sku || null,
         name: formData.name,
         description: formData.description || null,
         price: parseFloat(formData.price) || 0,
@@ -515,31 +553,47 @@ export default function Products() {
         {/* Products Table */}
         <Card className="card-warm">
           <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Daftar Produk ({filteredProducts.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-display flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Daftar Bahan / Produk ({filteredProducts.length})
+              </CardTitle>
+              {selectedProductIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground mr-2">
+                    {selectedProductIds.length} item dipilih
+                  </span>
+                  <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Hapus Pilihan
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nama Produk</TableHead>
+                    <TableHead className="w-12">
+                      <Checkbox 
+                        checked={selectedProductIds.length === filteredProducts.length && filteredProducts.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Kode Bahan</TableHead>
+                    <TableHead>Nama</TableHead>
+                    <TableHead>Satuan</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead className="text-right">Harga Jual</TableHead>
-                    <TableHead className="text-right">HPP</TableHead>
-                    <TableHead className="text-right">Margin</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Tipe</TableHead>
-                    <TableHead className="text-center">BOM</TableHead>
                     <TableHead className="text-center">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Tidak ada produk ditemukan
                       </TableCell>
                     </TableRow>
@@ -547,32 +601,26 @@ export default function Products() {
                     filteredProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>
+                          <Checkbox 
+                            checked={selectedProductIds.includes(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium text-muted-foreground">{(product as any).sku || '-'}</span>
+                        </TableCell>
+                        <TableCell>
                           <div>
                             <p className="font-medium">{product.name}</p>
                             {product.description && (
                               <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
                             )}
-                            {product.purchase_unit && product.base_unit && (
-                              <p className="text-xs text-blue-600">
-                                1 {product.purchase_unit} = {product.conversion_rate} {product.base_unit}
-                              </p>
-                            )}
                           </div>
                         </TableCell>
-                        <TableCell>{getCategoryName(product.category_id)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(product.price)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{formatCurrency((product as any).cost || 0)}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-medium ${
-                            Number(profitMargin(product.price, (product as any).cost || 0)) >= 30 
-                              ? 'text-green-600' 
-                              : Number(profitMargin(product.price, (product as any).cost || 0)) >= 15 
-                                ? 'text-yellow-600' 
-                                : 'text-red-600'
-                          }`}>
-                            {profitMargin(product.price, (product as any).cost || 0)}%
-                          </span>
+                        <TableCell>
+                          {product.base_unit || '-'}
                         </TableCell>
+                        <TableCell>{getCategoryName(product.category_id)}</TableCell>
                         <TableCell className="text-center">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             product.is_active 
@@ -581,22 +629,6 @@ export default function Products() {
                           }`}>
                             {product.is_active ? 'Aktif' : 'Nonaktif'}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {(product as any).is_service ? (
-                            <Badge variant="secondary">Layanan (tanpa stok)</Badge>
-                          ) : (
-                            <Badge variant="outline">Barang (sinkron inventory)</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {(product as any).is_service ? (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          ) : (bomCounts[product.id] || 0) > 0 ? (
-                            <Badge variant="secondary">{bomCounts[product.id]} bahan</Badge>
-                          ) : (
-                            <Badge variant="outline">Tanpa BOM</Badge>
-                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
@@ -644,14 +676,53 @@ export default function Products() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Produk *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Contoh: Potong Rambut Dewasa"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sku">Kode Bahan</Label>
+                  <Input
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    placeholder="Contoh: BHN-001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nama *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Contoh: Daging Sapi"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="base_unit">Satuan *</Label>
+                  <Input
+                    id="base_unit"
+                    value={formData.base_unit}
+                    onChange={(e) => setFormData({ ...formData, base_unit: e.target.value })}
+                    placeholder="kg, pcs, liter"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategori</Label>
+                  <Select
+                    value={formData.category_id}
+                    onValueChange={(v) => setFormData({ ...formData, category_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -660,53 +731,39 @@ export default function Products() {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Deskripsi singkat produk..."
+                  placeholder="Deskripsi singkat..."
                   rows={2}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="category">Kategori</Label>
-                <Select
-                  value={formData.category_id}
-                  onValueChange={(v) => setFormData({ ...formData, category_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Harga Jual *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="50000"
-                    min="0"
-                  />
+              {/* Optional / Advanced Settings hidden in accordion or just visually secondary */}
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-sm font-medium mb-3 text-muted-foreground">Pengaturan Lanjutan (Opsional)</p>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cost_price">Harga Pokok (HPP)</Label>
+                    <Input
+                      id="cost_price"
+                      type="number"
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Harga Jual</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cost_price">HPP (Harga Pokok)</Label>
-                  <Input
-                    id="cost_price"
-                    type="number"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    placeholder="0"
-                    min="0"
-                  />
-                  <p className="text-xs text-muted-foreground">Cost of Goods Sold</p>
-                </div>
-              </div>
               
               {!formData.is_service && (
                 <div className="grid grid-cols-3 gap-4 bg-muted/30 p-3 rounded-lg border border-border">
@@ -779,6 +836,7 @@ export default function Products() {
                   checked={formData.is_service}
                   onCheckedChange={(checked) => setFormData({ ...formData, is_service: checked })}
                 />
+              </div>
               </div>
             </div>
             <DialogFooter>
@@ -985,14 +1043,13 @@ export default function Products() {
           open={showBulkImport}
           onOpenChange={setShowBulkImport}
           config={{
-            entityName: 'Produk',
-            templateFileName: 'template_produk.xlsx',
+            entityName: 'Item/Bahan',
+            templateFileName: 'template_bahan.xlsx',
             columns: [
-              { key: 'name', label: 'Nama Produk', type: 'text', required: true, description: 'Nama produk (WAJIB)' },
-              { key: 'description', label: 'Deskripsi', type: 'text', required: false, description: 'Deskripsi singkat' },
+              { key: 'sku', label: 'Kode Bahan', type: 'text', required: false, description: 'Kode unik bahan' },
+              { key: 'name', label: 'Nama', type: 'text', required: true, description: 'Nama bahan (WAJIB)' },
+              { key: 'base_unit', label: 'Satuan', type: 'text', required: true, description: 'Satuan (WAJIB) cth: kg, pcs' },
               { key: 'category', label: 'Kategori', type: 'text', required: false, description: categories.map(c => c.name).join(', ') || 'Nama kategori', options: categories.map(c => c.name) },
-              { key: 'price', label: 'Harga Jual', type: 'number', required: true, description: 'Harga jual (angka)' },
-              { key: 'cost_price', label: 'HPP', type: 'number', required: false, description: 'Harga pokok (angka)', defaultValue: 0 },
               { key: 'is_active', label: 'Status Aktif', type: 'boolean', required: false, description: 'Ya / Tidak', defaultValue: 'Ya', options: ['Ya', 'Tidak'] },
             ],
             onImport: async (rows) => {
@@ -1010,11 +1067,12 @@ export default function Products() {
                   }
 
                   const { error } = await (supabase as any).from('products').insert({
+                    sku: row.sku ? String(row.sku) : null,
                     name: String(row.name),
-                    description: row.description ? String(row.description) : null,
-                    price: parseFloat(row.price) || 0,
-                    cost: parseFloat(row.cost_price) || 0,
+                    base_unit: String(row.base_unit),
                     category_id: categoryId,
+                    price: 0,
+                    cost: 0,
                     is_active: String(row.is_active).toLowerCase() !== 'tidak',
                     is_service: false,
                     outlet_id: selectedOutlet?.id,
